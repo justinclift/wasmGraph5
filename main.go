@@ -81,7 +81,7 @@ var (
 
 	// The point objects
 	axes = Object{
-		C: "lightgrey",
+		C: "lightblue",
 		P: []Point{
 			{X: -0.1, Y: 0.1, Z: 0.0},
 			{X: -0.1, Y: 10, Z: 0.0},
@@ -190,17 +190,18 @@ func main() {
 	worldSpace = make(map[string]Object, 1)
 	worldSpace["axes"] = importObject(axes, 0.0, 0.0, 0.0)
 
-	// TODO: Generate some points on the graph
+	// Generate some points on the graph
+	// TODO: Allow user input of equation to graph?
+	var graph Object
+	for x := -2.1; x <= 2.2; x += 0.1 {
+		graph.P = append(graph.P, Point{X: x, Y: x * x * x}) // y = x^3
+	}
+	graph.C = "red"
+	worldSpace["graph"] = importObject(graph, 0.0, 0.0, 0.0)
 
-	// TODO: Generate the points for the derivative
+	// TODO: Might be useful to add labels to the graph & derivatives
 
-	// Add some transformation operations to the queue
-	//queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 0, Y: 0, Z: 90}
-	//queue <- Operation{op: SCALE, t: 1000, f: 60, X: 2.0, Y: 2.0, Z: 2.0}
-	//queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 0, Y: 360, Z: 0}
-	//queue <- Operation{op: SCALE, t: 1000, f: 60, X: 0.5, Y: 0.5, Z: 0.5}
-	//queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 45, Y: 0, Z: -240}
-	//queue <- Operation{op: SCALE, t: 1000, f: 60, X: 1.5, Y: 1.5, Z: 1.52}
+	// TODO: Generate points for the 1st and 2nd order derivatives
 
 	// Keep the application running
 	done := make(chan struct{}, 0)
@@ -524,28 +525,38 @@ func renderFrame(args []js.Value) {
 			}
 		}
 
-		//// Draw the graph points
-		//var pointNum int
-		//ctx.Set("strokeStyle", "black")
-		//ctx.Set("lineWidth", "1")
-		//ctx.Set("fillStyle", "lightblue")
-		//ctx.Call("setLineDash", []interface{}{})
-		//for _, o := range worldSpace {
-		//	var px, py float64
-		//	for _, l := range o.P {
-		//		// Draw a dot for the point
-		//		px = centerX + (l.X * step)
-		//		py = centerY + ((l.Y * step) * -1)
-		//		ctx.Call("beginPath")
-		//		ctx.Call("ellipse", px, py, 5, 5, 0, 0, 2*math.Pi)
-		//		ctx.Call("fill")
-		//		ctx.Call("stroke")
-		//
-		//		// Label the point on the graph
-		//		//ctx.Set("font", "12px sans-serif")
-		//		//ctx.Call("fillText", fmt.Sprintf("Point %d", l.Num), px+5, py+15)
-		//	}
-		//}
+		// Draw the graph
+		ctx.Set("strokeStyle", "black")
+		ctx.Set("lineWidth", "1")
+		ctx.Call("setLineDash", []interface{}{})
+		var px, py float64
+		for n, o := range worldSpace {
+			if n != "axes" {
+				// Draw lines between the points
+				ctx.Call("beginPath")
+				for k, l := range o.P {
+					px = centerX + (l.X * step)
+					py = centerY + ((l.Y * step) * -1)
+					if k == 0 {
+						ctx.Call("moveTo", px, py)
+					} else {
+						ctx.Call("lineTo", px, py)
+					}
+				}
+				ctx.Call("stroke")
+
+				// Draw dots for the points
+				ctx.Set("fillStyle", o.C)
+				for _, l := range o.P {
+					px = centerX + (l.X * step)
+					py = centerY + ((l.Y * step) * -1)
+					ctx.Call("beginPath")
+					ctx.Call("ellipse", px, py, 2, 2, 0, 0, 2*math.Pi)
+					ctx.Call("fill")
+					ctx.Call("stroke")
+				}
+			}
+		}
 
 		// Clear the information area (right side)
 		ctx.Set("fillStyle", "white")
