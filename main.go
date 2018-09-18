@@ -72,6 +72,10 @@ func (p paintOrderSlice) Less(i, j int) bool {
 	return p[i].midZ < p[j].midZ
 }
 
+const (
+	sourceURL = "https://github.com/justinclift/wasmGraph4"
+)
+
 var (
 	// The empty world space
 	worldSpace   map[string]Object
@@ -101,49 +105,49 @@ var (
 			{1, 2, 3},
 		},
 	}
-	object2 = Object{
-		C: "lightgreen",
-		P: []Point{
-			{X: 1.5, Y: 1.5, Z: -1.0},  // Point 0 for this object
-			{X: 1.5, Y: -1.5, Z: -1.0}, // Point 1 for this object
-			{X: -1.5, Y: -1.5, Z: -1.0},
-		},
-		E: []Edge{
-			{0, 1}, // Connect point 0 to point 1
-			{1, 2}, // Connect point 1 to point 2
-			{2, 0}, // etc
-		},
-		S: []Surface{
-			{0, 1, 2},
-		},
-	}
-	object3 = Object{
-		C: "indianred",
-		P: []Point{
-			{X: 2, Y: -2, Z: 1.0},
-			{X: 2, Y: -4, Z: 1.0},
-			{X: -2, Y: -4, Z: 1.0},
-			{X: -2, Y: -2, Z: 1.0},
-			{X: 0, Y: -3, Z: 2.5},
-		},
-		E: []Edge{
-			{0, 1},
-			{1, 2},
-			{2, 3},
-			{3, 0},
-			{0, 4},
-			{1, 4},
-			{2, 4},
-			{3, 4},
-		},
-		S: []Surface{
-			{0, 1, 4},
-			{1, 2, 4},
-			{2, 3, 4},
-			{3, 0, 4},
-			{0, 1, 2, 3},
-		},
-	}
+	//object2 = Object{
+	//	C: "lightgreen",
+	//	P: []Point{
+	//		{X: 1.5, Y: 1.5, Z: -1.0},  // Point 0 for this object
+	//		{X: 1.5, Y: -1.5, Z: -1.0}, // Point 1 for this object
+	//		{X: -1.5, Y: -1.5, Z: -1.0},
+	//	},
+	//	E: []Edge{
+	//		{0, 1}, // Connect point 0 to point 1
+	//		{1, 2}, // Connect point 1 to point 2
+	//		{2, 0}, // etc
+	//	},
+	//	S: []Surface{
+	//		{0, 1, 2},
+	//	},
+	//}
+	//object3 = Object{
+	//	C: "indianred",
+	//	P: []Point{
+	//		{X: 2, Y: -2, Z: 1.0},
+	//		{X: 2, Y: -4, Z: 1.0},
+	//		{X: -2, Y: -4, Z: 1.0},
+	//		{X: -2, Y: -2, Z: 1.0},
+	//		{X: 0, Y: -3, Z: 2.5},
+	//	},
+	//	E: []Edge{
+	//		{0, 1},
+	//		{1, 2},
+	//		{2, 3},
+	//		{3, 0},
+	//		{0, 4},
+	//		{1, 4},
+	//		{2, 4},
+	//		{3, 4},
+	//	},
+	//	S: []Surface{
+	//		{0, 1, 4},
+	//		{1, 2, 4},
+	//		{2, 3, 4},
+	//		{3, 0, 4},
+	//		{0, 1, 2, 3},
+	//	},
+	//}
 
 	// The 4x4 identity matrix
 	identityMatrix = matrix{
@@ -215,17 +219,23 @@ func main() {
 	// Add some objects to the world space
 	worldSpace = make(map[string]Object, 1)
 	worldSpace["ob1"] = importObject(object1, 3.0, 3.0, 0.0)
-	worldSpace["ob1 copy"] = importObject(object1, -3.0, 3.0, 0.0)
-	worldSpace["ob2"] = importObject(object2, 3.0, -3.0, 1.0)
-	worldSpace["ob3"] = importObject(object3, -3.0, 0.0, -1.0)
+	//worldSpace["ob1 copy"] = importObject(object1, -3.0, 3.0, 0.0)
+	//worldSpace["ob2"] = importObject(object2, 3.0, -3.0, 1.0)
+	//worldSpace["ob3"] = importObject(object3, -3.0, 0.0, -1.0)
 
-	// Add some transformation operations to the queue
-	queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 0, Y: 0, Z: 90}
-	queue <- Operation{op: SCALE, t: 1000, f: 60, X: 2.0, Y: 2.0, Z: 2.0}
-	queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 0, Y: 360, Z: 0}
-	queue <- Operation{op: SCALE, t: 1000, f: 60, X: 0.5, Y: 0.5, Z: 0.5}
-	queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 45, Y: 0, Z: -240}
-	queue <- Operation{op: SCALE, t: 1000, f: 60, X: 1.5, Y: 1.5, Z: 1.52}
+	//// Add some transformation operations to the queue
+	//queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 0, Y: 0, Z: 90}
+	//queue <- Operation{op: SCALE, t: 1000, f: 60, X: 2.0, Y: 2.0, Z: 2.0}
+	//queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 0, Y: 360, Z: 0}
+	//queue <- Operation{op: SCALE, t: 1000, f: 60, X: 0.5, Y: 0.5, Z: 0.5}
+	//queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 45, Y: 0, Z: -240}
+	//queue <- Operation{op: SCALE, t: 1000, f: 60, X: 1.5, Y: 1.5, Z: 1.52}
+
+	// TODO: Add a 3D graph axis cross
+
+	// TODO: Generate some points on the graph
+
+	// TODO: Generate the points for the derivative
 
 	// Keep the application running
 	done := make(chan struct{}, 0)
@@ -246,10 +256,10 @@ func clickHandler(args []js.Value) {
 
 	// If the user clicks the source code URL area, open the URL
 	if clientX > graphWidth && clientY > (height-40) {
-		w := js.Global().Call("open", "https://github.com/justinclift/wasmGraph1")
+		w := js.Global().Call("open", sourceURL)
 		if w == js.Null() {
 			// Couldn't open a new window, so try loading directly in the existing one instead
-			doc.Set("location", "https://github.com/justinclift/wasmGraph1")
+			doc.Set("location", sourceURL)
 		}
 	}
 }
@@ -625,7 +635,7 @@ func renderFrame(args []js.Value) {
 		} else {
 			ctx.Set("font", "12px sans-serif")
 		}
-		ctx.Call("fillText", "https://github.com/justinclift/wasmGraph1", graphWidth+20, graphHeight-15)
+		ctx.Call("fillText", sourceURL, graphWidth+20, graphHeight-15)
 
 		// Draw a border around the graph area
 		ctx.Call("setLineDash", []interface{}{})
