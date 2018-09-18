@@ -5,7 +5,6 @@ package main
 import (
 	"fmt"
 	"math"
-	"sort"
 	"syscall/js"
 	"time"
 
@@ -15,10 +14,10 @@ import (
 type matrix []float64
 
 type Point struct {
-	Num int
-	X   float64
-	Y   float64
-	Z   float64
+	Label string
+	X     float64
+	Y     float64
+	Z     float64
 }
 
 type Edge []int
@@ -78,76 +77,47 @@ const (
 
 var (
 	// The empty world space
-	worldSpace   map[string]Object
-	pointCounter = 1
+	worldSpace map[string]Object
 
 	// The point objects
-	object1 = Object{
-		C: "lightblue",
+	axes = Object{
+		C: "lightgrey",
 		P: []Point{
-			{X: 0, Y: 1.75, Z: 1.0},    // Point 0 for this object
-			{X: 1.5, Y: -1.75, Z: 1.0}, // Point 1 for this object
-			{X: -1.5, Y: -1.75, Z: 1.0},
-			{X: 0, Y: 0, Z: 1.75},
+			{X: -0.1, Y: 0.1, Z: 0.0},
+			{X: -0.1, Y: 10, Z: 0.0},
+			{X: 0.1, Y: 10, Z: 0.0},
+			{X: 0.1, Y: 0.1, Z: 0.0},
+			{X: 10, Y: 0.1, Z: 0.0},
+			{X: 10, Y: -0.1, Z: 0.0},
+			{X: 0.1, Y: -0.1, Z: 0.0},
+			{X: 0.1, Y: -10, Z: 0.0},
+			{X: -0.1, Y: -10, Z: 0.0},
+			{X: -0.1, Y: -0.1, Z: 0.0},
+			{X: -10, Y: -0.1, Z: 0.0},
+			{X: -10, Y: 0.1, Z: 0.0},
+			{X: 10.2, Y: -0.15, Z: 0.0, Label: "X"},
+			{X: -10.4, Y: -0.15, Z: 0.0, Label: "-X"},
+			{X: 0.0, Y: 10.2, Z: 0.0, Label: "Y"},
+			{X: 0.0, Y: -10.5, Z: 0.0, Label: "-Y"},
 		},
 		E: []Edge{
-			{0, 1}, // Connect point 0 to point 1
-			{0, 2}, // Connect point 0 to point 2
-			{1, 2}, // Connect point 1 to point 2
-			{0, 3}, // etc
-			{1, 3},
+			{0, 1},
+			{1, 2},
 			{2, 3},
+			{3, 4},
+			{4, 5},
+			{5, 6},
+			{6, 7},
+			{7, 8},
+			{8, 9},
+			{9, 10},
+			{10, 11},
+			{11, 0},
 		},
 		S: []Surface{
-			{0, 1, 3},
-			{0, 2, 3},
-			{0, 1, 2},
-			{1, 2, 3},
+			{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
 		},
 	}
-	//object2 = Object{
-	//	C: "lightgreen",
-	//	P: []Point{
-	//		{X: 1.5, Y: 1.5, Z: -1.0},  // Point 0 for this object
-	//		{X: 1.5, Y: -1.5, Z: -1.0}, // Point 1 for this object
-	//		{X: -1.5, Y: -1.5, Z: -1.0},
-	//	},
-	//	E: []Edge{
-	//		{0, 1}, // Connect point 0 to point 1
-	//		{1, 2}, // Connect point 1 to point 2
-	//		{2, 0}, // etc
-	//	},
-	//	S: []Surface{
-	//		{0, 1, 2},
-	//	},
-	//}
-	//object3 = Object{
-	//	C: "indianred",
-	//	P: []Point{
-	//		{X: 2, Y: -2, Z: 1.0},
-	//		{X: 2, Y: -4, Z: 1.0},
-	//		{X: -2, Y: -4, Z: 1.0},
-	//		{X: -2, Y: -2, Z: 1.0},
-	//		{X: 0, Y: -3, Z: 2.5},
-	//	},
-	//	E: []Edge{
-	//		{0, 1},
-	//		{1, 2},
-	//		{2, 3},
-	//		{3, 0},
-	//		{0, 4},
-	//		{1, 4},
-	//		{2, 4},
-	//		{3, 4},
-	//	},
-	//	S: []Surface{
-	//		{0, 1, 4},
-	//		{1, 2, 4},
-	//		{2, 3, 4},
-	//		{3, 0, 4},
-	//		{0, 1, 2, 3},
-	//	},
-	//}
 
 	// The 4x4 identity matrix
 	identityMatrix = matrix{
@@ -216,26 +186,21 @@ func main() {
 	queue = make(chan Operation)
 	go processOperations(queue)
 
-	// Add some objects to the world space
+	// Add the X/Y axes object to the world space
 	worldSpace = make(map[string]Object, 1)
-	worldSpace["ob1"] = importObject(object1, 3.0, 3.0, 0.0)
-	//worldSpace["ob1 copy"] = importObject(object1, -3.0, 3.0, 0.0)
-	//worldSpace["ob2"] = importObject(object2, 3.0, -3.0, 1.0)
-	//worldSpace["ob3"] = importObject(object3, -3.0, 0.0, -1.0)
+	worldSpace["axes"] = importObject(axes, 0.0, 0.0, 0.0)
 
-	//// Add some transformation operations to the queue
+	// TODO: Generate some points on the graph
+
+	// TODO: Generate the points for the derivative
+
+	// Add some transformation operations to the queue
 	//queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 0, Y: 0, Z: 90}
 	//queue <- Operation{op: SCALE, t: 1000, f: 60, X: 2.0, Y: 2.0, Z: 2.0}
 	//queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 0, Y: 360, Z: 0}
 	//queue <- Operation{op: SCALE, t: 1000, f: 60, X: 0.5, Y: 0.5, Z: 0.5}
 	//queue <- Operation{op: ROTATE, t: 1000, f: 60, X: 45, Y: 0, Z: -240}
 	//queue <- Operation{op: SCALE, t: 1000, f: 60, X: 1.5, Y: 1.5, Z: 1.52}
-
-	// TODO: Add a 3D graph axis cross
-
-	// TODO: Generate some points on the graph
-
-	// TODO: Generate the points for the derivative
 
 	// Keep the application running
 	done := make(chan struct{}, 0)
@@ -276,27 +241,16 @@ func importObject(ob Object, x float64, y float64, z float64) (translatedObject 
 	}
 
 	// Translate the points
-	var midX, midY, midZ float64
 	var pt Point
 	for _, j := range ob.P {
 		pt = Point{
-			Num: pointCounter,
-			X:   (translateMatrix[0] * j.X) + (translateMatrix[1] * j.Y) + (translateMatrix[2] * j.Z) + (translateMatrix[3] * 1),   // 1st col, top
-			Y:   (translateMatrix[4] * j.X) + (translateMatrix[5] * j.Y) + (translateMatrix[6] * j.Z) + (translateMatrix[7] * 1),   // 1st col, upper middle
-			Z:   (translateMatrix[8] * j.X) + (translateMatrix[9] * j.Y) + (translateMatrix[10] * j.Z) + (translateMatrix[11] * 1), // 1st col, lower middle
+			Label: j.Label,
+			X:     (translateMatrix[0] * j.X) + (translateMatrix[1] * j.Y) + (translateMatrix[2] * j.Z) + (translateMatrix[3] * 1),   // 1st col, top
+			Y:     (translateMatrix[4] * j.X) + (translateMatrix[5] * j.Y) + (translateMatrix[6] * j.Z) + (translateMatrix[7] * 1),   // 1st col, upper middle
+			Z:     (translateMatrix[8] * j.X) + (translateMatrix[9] * j.Y) + (translateMatrix[10] * j.Z) + (translateMatrix[11] * 1), // 1st col, lower middle
 		}
 		translatedObject.P = append(translatedObject.P, pt)
-		midX = pt.X
-		midY = pt.Y
-		midZ = pt.Z
-		pointCounter++
 	}
-
-	// Determine the mid point for the object
-	numPts := float64(len(ob.P))
-	translatedObject.Mid.X = midX / numPts
-	translatedObject.Mid.Y = midY / numPts
-	translatedObject.Mid.Z = midZ / numPts
 
 	// Copy the colour, edge, and surface definitions across
 	translatedObject.C = ob.C
@@ -519,19 +473,12 @@ func renderFrame(args []js.Value) {
 			ctx.Call("stroke")
 		}
 
-		// Sort the objects by mid point Z depth order
-		var order paintOrderSlice
-		for i, j := range worldSpace {
-			order = append(order, paintOrder{name: i, midZ: j.Mid.Z})
-		}
-		sort.Sort(paintOrderSlice(order))
-
-		// Draw the objects, in Z depth order
+		// Draw the axes
 		var pointX, pointY float64
-		var pointNum int
-		numWld := len(worldSpace)
-		for i := 0; i < numWld; i++ {
-			o := worldSpace[order[i].name]
+		ctx.Set("strokeStyle", "black")
+		ctx.Set("lineWidth", "1")
+		ctx.Call("setLineDash", []interface{}{})
+		for _, o := range worldSpace {
 
 			// Draw the surfaces
 			ctx.Set("fillStyle", o.C)
@@ -551,10 +498,6 @@ func renderFrame(args []js.Value) {
 			}
 
 			// Draw the edges
-			ctx.Set("strokeStyle", "black")
-			ctx.Set("fillStyle", "black")
-			ctx.Set("lineWidth", "1")
-			ctx.Call("setLineDash", []interface{}{2, 4})
 			var point1X, point1Y, point2X, point2Y float64
 			for _, l := range o.E {
 				point1X = o.P[l[0]].X
@@ -567,22 +510,42 @@ func renderFrame(args []js.Value) {
 				ctx.Call("stroke")
 			}
 
-			// Draw the points on the graph
-			ctx.Call("setLineDash", []interface{}{})
+			// Draw any point labels
+			ctx.Set("fillStyle", "black")
+			ctx.Set("textAlign", "center")
+			ctx.Set("font", "bold 14px serif")
 			var px, py float64
 			for _, l := range o.P {
-				// Draw a dot for the point
-				px = centerX + (l.X * step)
-				py = centerY + ((l.Y * step) * -1)
-				ctx.Call("beginPath")
-				ctx.Call("arc", px, py, 1, 0, 2*math.Pi)
-				ctx.Call("fill")
-
-				// Label the point on the graph
-				ctx.Set("font", "12px sans-serif")
-				ctx.Call("fillText", fmt.Sprintf("Point %d", l.Num), px+5, py+15)
+				if l.Label != "" {
+					px = centerX + (l.X * step)
+					py = centerY + ((l.Y * step) * -1)
+					ctx.Call("fillText", l.Label, px, py)
+				}
 			}
 		}
+
+		//// Draw the graph points
+		//var pointNum int
+		//ctx.Set("strokeStyle", "black")
+		//ctx.Set("lineWidth", "1")
+		//ctx.Set("fillStyle", "lightblue")
+		//ctx.Call("setLineDash", []interface{}{})
+		//for _, o := range worldSpace {
+		//	var px, py float64
+		//	for _, l := range o.P {
+		//		// Draw a dot for the point
+		//		px = centerX + (l.X * step)
+		//		py = centerY + ((l.Y * step) * -1)
+		//		ctx.Call("beginPath")
+		//		ctx.Call("ellipse", px, py, 5, 5, 0, 0, 2*math.Pi)
+		//		ctx.Call("fill")
+		//		ctx.Call("stroke")
+		//
+		//		// Label the point on the graph
+		//		//ctx.Set("font", "12px sans-serif")
+		//		//ctx.Call("fillText", fmt.Sprintf("Point %d", l.Num), px+5, py+15)
+		//	}
+		//}
 
 		// Clear the information area (right side)
 		ctx.Set("fillStyle", "white")
@@ -592,6 +555,7 @@ func renderFrame(args []js.Value) {
 		textY := top + 20
 		ctx.Set("fillStyle", "black")
 		ctx.Set("font", "bold 14px serif")
+		ctx.Set("textAlign", "left")
 		ctx.Call("fillText", "Operation:", graphWidth+20, textY)
 		textY += 20
 		ctx.Set("font", "14px sans-serif")
@@ -607,19 +571,19 @@ func renderFrame(args []js.Value) {
 		textY += 10
 
 		// Add the point co-ordinate information
-		ctx.Set("fillStyle", "black")
-		for _, o := range worldSpace {
-			for _, l := range o.P {
-				// Draw darker coloured legend text
-				ctx.Set("font", "bold 14px serif")
-				ctx.Call("fillText", fmt.Sprintf("Point %d:", l.Num), graphWidth+20, textY+float64(l.Num*25))
-
-				// Draw lighter coloured legend text
-				ctx.Set("font", "12px sans-serif")
-				ctx.Call("fillText", fmt.Sprintf("(%0.1f, %0.1f, %0.1f)", l.X, l.Y, l.Z), graphWidth+100, textY+float64(l.Num*25))
-				pointNum++
-			}
-		}
+		//ctx.Set("fillStyle", "black")
+		//for _, o := range worldSpace {
+		//	for _, l := range o.P {
+		//		// Draw darker coloured legend text
+		//		ctx.Set("font", "bold 14px serif")
+		//		ctx.Call("fillText", fmt.Sprintf("Point %d:", l.Num), graphWidth+20, textY+float64(l.Num*25))
+		//
+		//		// Draw lighter coloured legend text
+		//		ctx.Set("font", "12px sans-serif")
+		//		ctx.Call("fillText", fmt.Sprintf("(%0.1f, %0.1f, %0.1f)", l.X, l.Y, l.Z), graphWidth+100, textY+float64(l.Num*25))
+		//		pointNum++
+		//	}
+		//}
 
 		// Clear the source code link area
 		ctx.Set("fillStyle", "white")
@@ -729,7 +693,7 @@ func transform(m matrix, p Point) (t Point) {
 	//bot2 := m[14]
 	//bot3 := m[15]
 
-	t.Num = p.Num
+	t.Label = p.Label
 	t.X = (top0 * p.X) + (top1 * p.Y) + (top2 * p.Z) + top3
 	t.Y = (upperMid0 * p.X) + (upperMid1 * p.Y) + (upperMid2 * p.Z) + upperMid3
 	t.Z = (lowerMid0 * p.X) + (lowerMid1 * p.Y) + (lowerMid2 * p.Z) + lowerMid3
