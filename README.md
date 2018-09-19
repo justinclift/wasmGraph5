@@ -2,8 +2,8 @@
 
 Online demo: https://justinclift.github.io/wasmGraph4/
 
-This renders a basic XY graph, and it's first derivative, onto the
-2D canvas.
+This renders points of a basic 2D equation, and it's first derivative,
+onto the canvas.
 
 Use the wasd, arrow, and numpad keys (including + and -) to rotate the
 graph around the origin.  Use the mouse wheel to zoom in and out.
