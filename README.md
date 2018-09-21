@@ -3,10 +3,10 @@
 Online demo: https://justinclift.github.io/wasmGraph5/
 
 This renders points of a basic 2D equation, and it's first derivative,
-onto the canvas.  It uses an [external library](https://godoc.org/github.com/corywalker/expreduce) for doing the math, which
-seems to slow things down to an extreme level.  Previously this demo
-loaded in under a second, now it's taking 10-15+ seconds after loading
-to start.
+onto the canvas.  It uses an [external library](https://github.com/corywalker/expreduce) for doing the math, which
+seems to both bloat the resulting .wasm file, and slow things down to
+an extreme level.  Previously this demo loaded in under a second, now
+it's taking 10-15+ seconds after loading to start. :frowning:
 
 Use the wasd, arrow, and numpad keys (including + and -) to rotate the
 graph around the origin.  Use the mouse wheel to zoom in and out.
