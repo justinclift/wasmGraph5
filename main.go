@@ -5,7 +5,6 @@ package main
 import (
 	"fmt"
 	"math"
-	"sort"
 	"strconv"
 	"syscall/js"
 	"time"
@@ -28,12 +27,11 @@ type Edge []int
 type Surface []int
 
 type Object struct {
-	C         string // Colour of the object
-	P         []Point
-	E         []Edge    // List of points to connect by edges
-	S         []Surface // List of points to connect in order, to create a surface
-	DrawOrder int       // Draw order for the object
-	Name      string
+	C    string // Colour of the object
+	P    []Point
+	E    []Edge    // List of points to connect by edges
+	S    []Surface // List of points to connect in order, to create a surface
+	Name string
 }
 
 type OperationType int
@@ -53,29 +51,6 @@ type Operation struct {
 	Z  float64
 }
 
-type drawOrder struct {
-	order    int // Draw order for an object
-	spaceNum int // Index of the object in the worldSpace slice
-}
-
-type drawOrderSlice []drawOrder
-
-func (o drawOrder) String() string {
-	return fmt.Sprintf("Object: %v, Order: %v", o.spaceNum, o.order)
-}
-
-func (o drawOrderSlice) Len() int {
-	return len(o)
-}
-
-func (o drawOrderSlice) Swap(i, j int) {
-	o[i], o[j] = o[j], o[i]
-}
-
-func (o drawOrderSlice) Less(i, j int) bool {
-	return o[i].order < o[j].order
-}
-
 const (
 	sourceURL = "https://github.com/justinclift/wasmGraph5"
 )
@@ -86,9 +61,8 @@ var (
 
 	// The point objects
 	axes = Object{
-		C:         "grey",
-		DrawOrder: 0,
-		Name:      "axes",
+		C:    "grey",
+		Name: "axes",
 		P: []Point{
 			{X: -0.1, Y: 0.1, Z: 0.0},
 			{X: -0.1, Y: 10, Z: 0.0},
@@ -151,7 +125,6 @@ var (
 	opText              string
 	highLightSource     bool
 	pointStep           = 0.05
-	order               drawOrderSlice
 	debug               = false // If true, some debugging info is printed to the javascript console
 )
 
@@ -202,7 +175,8 @@ func main() {
 	// Create a graph object with the main data points on it
 	// TODO: Allow user input of equation to graph
 	//eqStr = "x^2"
-	eqStr = "x^3"
+	//eqStr = "x^3"
+	eqStr = "(x^3)/2"
 	var firstDeriv, graph Object
 	var p Point
 	errOccurred := false
@@ -239,7 +213,6 @@ func main() {
 	} else {
 		graph.C = "blue"
 	}
-	graph.DrawOrder = 1
 	graph.Name = "graph"
 	worldSpace = append(worldSpace, importObject(graph, 0.0, 0.0, 0.0))
 
@@ -285,17 +258,10 @@ func main() {
 	} else {
 		firstDeriv.C = "green"
 	}
-	firstDeriv.DrawOrder = 2
 	firstDeriv.Name = "firstDeriv"
 	worldSpace = append(worldSpace, importObject(firstDeriv, 0.0, 0.0, 0.0))
 
 	// TODO: Generate points for the 2nd+ order derivatives?
-
-	// Sort the objects by draw order - this stops flickering of objects at same depth overwriting each other when drawn
-	for i, j := range worldSpace {
-		order = append(order, drawOrder{spaceNum: i, order: j.DrawOrder})
-	}
-	sort.Sort(drawOrderSlice(order))
 
 	// Keep the application running
 	done := make(chan struct{}, 0)
@@ -351,7 +317,6 @@ func importObject(ob Object, x float64, y float64, z float64) (translatedObject 
 	// Copy the remaining object info across
 	translatedObject.C = ob.C
 	translatedObject.Name = ob.Name
-	translatedObject.DrawOrder = ob.DrawOrder
 	for _, j := range ob.E {
 		translatedObject.E = append(translatedObject.E, j)
 	}
@@ -623,7 +588,7 @@ func renderFrame(args []js.Value) {
 	var px, py float64
 	numWld := len(worldSpace)
 	for i := 0; i < numWld; i++ {
-		o := worldSpace[order[i].spaceNum]
+		o := worldSpace[i]
 		if o.Name != "axes" {
 			// Draw lines between the points
 			ctx.Set("strokeStyle", o.C)
