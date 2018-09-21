@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"syscall/js"
 	"time"
 
@@ -76,7 +77,7 @@ func (o drawOrderSlice) Less(i, j int) bool {
 }
 
 const (
-	sourceURL = "https://github.com/justinclift/wasmGraph4"
+	sourceURL = "https://github.com/justinclift/wasmGraph5"
 )
 
 var (
@@ -146,7 +147,7 @@ var (
 	cCall, kCall, mCall js.Callback
 	rCall, wCall        js.Callback
 	ctx, doc, canvasEl  js.Value
-	opText              string
+	eqStr, opText       string
 	highLightSource     bool
 	pointStep           = 0.05
 	order               drawOrderSlice
@@ -197,44 +198,86 @@ func main() {
 	// Add the X/Y axes object to the world space
 	worldSpace = append(worldSpace, importObject(axes, 0.0, 0.0, 0.0))
 
-	// Set up the equation for evaluation
-	// TODO: Allow user input of equation to graph?
-	evalState := eq.NewEvalState()
-	expr := eq.Interp("Solve[x=2.1, x^3]", evalState)
-	result := expr.Eval(evalState)
-	result = evalState.ProcessTopLevelResult(expr, result)
-	fmt.Printf("Result: %v\n", result.StringForm(eq.ActualStringFormArgsFull("InputForm", evalState)))
-
 	// Create a graph object with the main data points on it
+	// TODO: Allow user input of equation to graph
+	eqStr = "x^3"
 	var firstDeriv, graph Object
 	var p Point
+	errOccurred := false
 	graphLabeled := false
-	for x := -2.1; x <= 2.2; x += 0.05 {
-		p = Point{X: x, Y: x * x * x} // y = x^3
+	evalState := eq.NewEvalState()
+	expr := eq.Interp(fmt.Sprintf("f[x_] := %s", eqStr), evalState)
+	result := expr.Eval(evalState)
+	result = evalState.ProcessTopLevelResult(expr, result)
+	for x := -2.1; x <= 2.1; x += 0.05 {
+		expr = eq.Interp(fmt.Sprintf("x=%.2f", x), evalState)
+		result := expr.Eval(evalState)
+		result = evalState.ProcessTopLevelResult(expr, result)
+		expr = eq.Interp("f[x]", evalState)
+		result = expr.Eval(evalState)
+		result = evalState.ProcessTopLevelResult(expr, result)
+		y, err := strconv.ParseFloat(result.StringForm(eq.ActualStringFormArgsFull("InputForm", evalState)), 64)
+		if err != nil {
+			y = -1 // Set this to -1 to visually indicate something went wrong
+			errOccurred = true
+			fmt.Printf("Error: %v\n", err)
+		}
+		p = Point{X: x, Y: y}
 		if !graphLabeled {
+			// TODO: Add some useful way to translate between superscript and "^n" input/display styles
 			p.Label = " Equation: y = x³ "
 			p.LabelAlign = "right"
 			graphLabeled = true
 		}
 		graph.P = append(graph.P, p)
 	}
-	graph.C = "blue"
+	if errOccurred {
+		graph.C = "red" // Draw the line in red if an error occurred with the calculation
+	} else {
+		graph.C = "blue"
+	}
 	graph.DrawOrder = 1
 	graph.Name = "graph"
 	worldSpace = append(worldSpace, importObject(graph, 0.0, 0.0, 0.0))
 
 	// Create a graph object with the 1st order derivative points on it
+	var derivStr string
+	errOccurred = false
 	graphLabeled = false
-	for x := -2.1; x <= 2.2; x += pointStep {
-		p = Point{X: x, Y: 2 * (x * x)} // y = 2x^2
+	derivState := eq.NewEvalState()
+	derivExpr := eq.Interp(fmt.Sprintf("f[x_] := %s", eqStr), derivState)
+	derivResult := derivExpr.Eval(derivState)
+	derivResult = derivState.ProcessTopLevelResult(derivExpr, derivResult)
+	for x := -2.1; x <= 2.1; x += pointStep {
+		derivStr = fmt.Sprintf("D[f[x],x] /. x -> %.2f", x)
+		derivExpr = eq.Interp(derivStr, derivState)
+		derivResult := derivExpr.Eval(derivState)
+		derivResult = derivState.ProcessTopLevelResult(derivExpr, derivResult)
+		tmp := derivResult.StringForm(eq.ActualStringFormArgsFull("OutputForm", derivState))
+		if debug {
+			fmt.Printf("Val: %0.2f Derivative String: %v Result: %v\n", x, derivStr, tmp)
+		}
+		y, err := strconv.ParseFloat(tmp, 64)
+		if err != nil {
+			y = -1 // Set this to -1 to visually indicate something went wrong
+			errOccurred = true
+			fmt.Printf("Error: %v\n", err)
+		}
+		p = Point{X: x, Y: y}
 		if !graphLabeled {
-			p.Label = " 1st order derivative: y = 2x² "
+			// TODO: See if there's a way to get a human readable version of the derivative string from expreduce
+			p.Label = " 1st order derivative "
+			//p.Label = " 1st order derivative: y = 3x² "
 			p.LabelAlign = "right"
 			graphLabeled = true
 		}
 		firstDeriv.P = append(firstDeriv.P, p)
 	}
-	firstDeriv.C = "green"
+	if errOccurred {
+		firstDeriv.C = "red" // Draw the line in red if an error occurred with the calculation
+	} else {
+		firstDeriv.C = "green"
+	}
 	firstDeriv.DrawOrder = 2
 	firstDeriv.Name = "firstDeriv"
 	worldSpace = append(worldSpace, importObject(firstDeriv, 0.0, 0.0, 0.0))
@@ -632,19 +675,20 @@ func renderFrame(args []js.Value) {
 	ctx.Call("fillText", "Equation", graphWidth+20, textY)
 	textY += 20
 	ctx.Set("font", "16px sans-serif")
-	ctx.Call("fillText", "y = x³", graphWidth+40, textY)
+	ctx.Call("fillText", eqStr, graphWidth+40, textY)
+	//ctx.Call("fillText", "y = x³", graphWidth+40, textY)
 	textY += 30
 
 	// Add the derivatives information
-	ctx.Set("font", "bold 18px serif")
-	ctx.Call("fillText", "1st order derivative", graphWidth+20, textY)
-	textY += 20
-	ctx.Set("font", "16px sans-serif")
-	ctx.Call("fillText", "y = 2x²", graphWidth+40, textY)
-
-	// Clear the source code link area
-	ctx.Set("fillStyle", "white")
-	ctx.Call("fillRect", graphWidth+1, graphHeight-55, width, height)
+	//ctx.Set("font", "bold 18px serif")
+	//ctx.Call("fillText", "1st order derivative", graphWidth+20, textY)
+	//textY += 20
+	//ctx.Set("font", "16px sans-serif")
+	//ctx.Call("fillText", "y = 3x²", graphWidth+40, textY)
+	//
+	//// Clear the source code link area
+	//ctx.Set("fillStyle", "white")
+	//ctx.Call("fillRect", graphWidth+1, graphHeight-55, width, height)
 
 	// Add the URL to the source code
 	ctx.Set("fillStyle", "black")
