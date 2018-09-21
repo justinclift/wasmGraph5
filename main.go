@@ -147,7 +147,8 @@ var (
 	cCall, kCall, mCall js.Callback
 	rCall, wCall        js.Callback
 	ctx, doc, canvasEl  js.Value
-	eqStr, opText       string
+	eqStr, derivStr     string
+	opText              string
 	highLightSource     bool
 	pointStep           = 0.05
 	order               drawOrderSlice
@@ -200,6 +201,7 @@ func main() {
 
 	// Create a graph object with the main data points on it
 	// TODO: Allow user input of equation to graph
+	//eqStr = "x^2"
 	eqStr = "x^3"
 	var firstDeriv, graph Object
 	var p Point
@@ -225,7 +227,8 @@ func main() {
 		p = Point{X: x, Y: y}
 		if !graphLabeled {
 			// TODO: Add some useful way to translate between superscript and "^n" input/display styles
-			p.Label = " Equation: y = x³ "
+			p.Label = fmt.Sprintf(" Equation: y = %s ", eqStr)
+			//p.Label = " Equation: y = x³ "
 			p.LabelAlign = "right"
 			graphLabeled = true
 		}
@@ -240,18 +243,24 @@ func main() {
 	graph.Name = "graph"
 	worldSpace = append(worldSpace, importObject(graph, 0.0, 0.0, 0.0))
 
+	// Retrieve the human readable string for the 1st order derivative
+	tmpStr := fmt.Sprintf("D[%s, x]", eqStr)
+	tmpState := eq.NewEvalState()
+	tmpExpr := eq.Interp(tmpStr, tmpState)
+	tmpResult := tmpExpr.Eval(tmpState)
+	tmpResult = tmpState.ProcessTopLevelResult(tmpExpr, tmpResult)
+	derivStr = tmpResult.StringForm(eq.ActualStringFormArgsFull("OutputForm", tmpState))
+
 	// Create a graph object with the 1st order derivative points on it
-	var derivStr string
+	var derivEq string
+	var derivExpr, derivResult eq.Ex
 	errOccurred = false
 	graphLabeled = false
 	derivState := eq.NewEvalState()
-	derivExpr := eq.Interp(fmt.Sprintf("f[x_] := %s", eqStr), derivState)
-	derivResult := derivExpr.Eval(derivState)
-	derivResult = derivState.ProcessTopLevelResult(derivExpr, derivResult)
 	for x := -2.1; x <= 2.1; x += pointStep {
-		derivStr = fmt.Sprintf("D[f[x],x] /. x -> %.2f", x)
-		derivExpr = eq.Interp(derivStr, derivState)
-		derivResult := derivExpr.Eval(derivState)
+		derivEq = fmt.Sprintf("D[%s,x] /. x -> %.2f", eqStr, x)
+		derivExpr = eq.Interp(derivEq, derivState)
+		derivResult = derivExpr.Eval(derivState)
 		derivResult = derivState.ProcessTopLevelResult(derivExpr, derivResult)
 		tmp := derivResult.StringForm(eq.ActualStringFormArgsFull("OutputForm", derivState))
 		if debug {
@@ -265,9 +274,7 @@ func main() {
 		}
 		p = Point{X: x, Y: y}
 		if !graphLabeled {
-			// TODO: See if there's a way to get a human readable version of the derivative string from expreduce
-			p.Label = " 1st order derivative "
-			//p.Label = " 1st order derivative: y = 3x² "
+			p.Label = fmt.Sprintf(" 1st order derivative: y = %s ", derivStr)
 			p.LabelAlign = "right"
 			graphLabeled = true
 		}
@@ -282,7 +289,7 @@ func main() {
 	firstDeriv.Name = "firstDeriv"
 	worldSpace = append(worldSpace, importObject(firstDeriv, 0.0, 0.0, 0.0))
 
-	// TODO: Generate points for the 2nd order derivative?
+	// TODO: Generate points for the 2nd+ order derivatives?
 
 	// Sort the objects by draw order - this stops flickering of objects at same depth overwriting each other when drawn
 	for i, j := range worldSpace {
@@ -669,26 +676,24 @@ func renderFrame(args []js.Value) {
 	textY += 30
 
 	// Add the graph and derivatives information
-	// TODO: Put the equation into a structure or string (TBD), and have everything automatically derived from that
 	ctx.Set("fillStyle", "black")
 	ctx.Set("font", "bold 18px serif")
 	ctx.Call("fillText", "Equation", graphWidth+20, textY)
 	textY += 20
 	ctx.Set("font", "16px sans-serif")
 	ctx.Call("fillText", eqStr, graphWidth+40, textY)
-	//ctx.Call("fillText", "y = x³", graphWidth+40, textY)
 	textY += 30
 
 	// Add the derivatives information
-	//ctx.Set("font", "bold 18px serif")
-	//ctx.Call("fillText", "1st order derivative", graphWidth+20, textY)
-	//textY += 20
-	//ctx.Set("font", "16px sans-serif")
-	//ctx.Call("fillText", "y = 3x²", graphWidth+40, textY)
-	//
-	//// Clear the source code link area
-	//ctx.Set("fillStyle", "white")
-	//ctx.Call("fillRect", graphWidth+1, graphHeight-55, width, height)
+	ctx.Set("font", "bold 18px serif")
+	ctx.Call("fillText", "1st order derivative", graphWidth+20, textY)
+	textY += 20
+	ctx.Set("font", "16px sans-serif")
+	ctx.Call("fillText", fmt.Sprintf("y = %s", derivStr), graphWidth+40, textY)
+
+	// Clear the source code link area
+	ctx.Set("fillStyle", "white")
+	ctx.Call("fillRect", graphWidth+1, graphHeight-55, width, height)
 
 	// Add the URL to the source code
 	ctx.Set("fillStyle", "black")
