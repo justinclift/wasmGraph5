@@ -9,6 +9,7 @@ import (
 	"syscall/js"
 	"time"
 
+	eq "github.com/corywalker/expreduce/expreduce"
 	"go.uber.org/atomic"
 )
 
@@ -196,10 +197,15 @@ func main() {
 	// Add the X/Y axes object to the world space
 	worldSpace = append(worldSpace, importObject(axes, 0.0, 0.0, 0.0))
 
-	// Create a graph object with the main data points on it
+	// Set up the equation for evaluation
 	// TODO: Allow user input of equation to graph?
-	//       That will probably mean we need to pull in some general algebra system solver, to avoid having to write
-	//       one just for this (!).  At a first glance, corywalker/expreduce seems like it might be a decent fit.
+	evalState := eq.NewEvalState()
+	expr := eq.Interp("Solve[x=2.1, x^3]", evalState)
+	result := expr.Eval(evalState)
+	result = evalState.ProcessTopLevelResult(expr, result)
+	fmt.Printf("Result: %v\n", result.StringForm(eq.ActualStringFormArgsFull("InputForm", evalState)))
+
+	// Create a graph object with the main data points on it
 	var firstDeriv, graph Object
 	var p Point
 	graphLabeled := false
@@ -549,7 +555,7 @@ func renderFrame(args []js.Value) {
 
 		// Draw any point labels
 		ctx.Set("fillStyle", "black")
-		ctx.Set("font", "bold 14px serif")
+		ctx.Set("font", "bold 16px serif")
 		var px, py float64
 		for _, l := range o.P {
 			if l.Label != "" {
@@ -622,18 +628,18 @@ func renderFrame(args []js.Value) {
 	// Add the graph and derivatives information
 	// TODO: Put the equation into a structure or string (TBD), and have everything automatically derived from that
 	ctx.Set("fillStyle", "black")
-	ctx.Set("font", "bold 14px serif")
+	ctx.Set("font", "bold 18px serif")
 	ctx.Call("fillText", "Equation", graphWidth+20, textY)
 	textY += 20
-	ctx.Set("font", "12px sans-serif")
+	ctx.Set("font", "16px sans-serif")
 	ctx.Call("fillText", "y = x³", graphWidth+40, textY)
 	textY += 30
 
 	// Add the derivatives information
-	ctx.Set("font", "bold 14px serif")
+	ctx.Set("font", "bold 18px serif")
 	ctx.Call("fillText", "1st order derivative", graphWidth+20, textY)
 	textY += 20
-	ctx.Set("font", "12px sans-serif")
+	ctx.Set("font", "16px sans-serif")
 	ctx.Call("fillText", "y = 2x²", graphWidth+40, textY)
 
 	// Clear the source code link area
