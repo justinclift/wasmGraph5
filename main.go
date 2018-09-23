@@ -5,7 +5,9 @@ package main
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
+	"strings"
 	"syscall/js"
 	"time"
 
@@ -203,9 +205,7 @@ func main() {
 		}
 		p = Point{X: x, Y: y}
 		if !graphLabeled {
-			// TODO: Add some useful way to translate between superscript and "^n" input/display styles
-			p.Label = fmt.Sprintf(" Equation: y = %s ", eqStr)
-			//p.Label = " Equation: y = x³ "
+			p.Label = fmt.Sprintf(" Equation: y = %s ", mathFormat(eqStr))
 			p.LabelAlign = "right"
 			graphLabeled = true
 		}
@@ -217,7 +217,7 @@ func main() {
 		graph.C = "blue"
 	}
 	graph.Name = "Equation"
-	graph.Eq = fmt.Sprintf("y = %s", eqStr)
+	graph.Eq = fmt.Sprintf("y = %s", mathFormat(eqStr))
 	worldSpace = append(worldSpace, importObject(graph, 0.0, 0.0, 0.0))
 
 	// Graph the derivatives of the equation
@@ -294,7 +294,7 @@ func main() {
 
 			p = Point{X: x, Y: y}
 			if !graphLabeled {
-				p.Label = fmt.Sprintf(" %s order derivative: y = %s ", strDeriv(derivNum), derivStr)
+				p.Label = fmt.Sprintf(" %s order derivative: y = %s ", strDeriv(derivNum), mathFormat(derivStr))
 				p.LabelAlign = "right"
 				graphLabeled = true
 			}
@@ -306,7 +306,7 @@ func main() {
 			deriv.C = colDeriv(derivNum)
 		}
 		deriv.Name = fmt.Sprintf("%s order derivative", strDeriv(derivNum))
-		deriv.Eq = fmt.Sprintf("y = %s", derivStr)
+		deriv.Eq = fmt.Sprintf("y = %s", mathFormat(derivStr))
 		worldSpace = append(worldSpace, importObject(deriv, 0.0, 0.0, 0.0))
 		eqStr = derivStr
 		derivNum++
@@ -426,6 +426,42 @@ func keypressHandler(args []js.Value) {
 			queue <- Operation{op: ROTATE, t: 50, f: 12, X: 0, Y: 0, Z: stepSize}
 		}
 	}
+}
+
+// Pretty formatting of maths strings.  Changes (say) x^3 to x³
+func mathFormat(s string) string {
+	numFind := regexp.MustCompile(`\^[0-9]+`)
+	numFind.Longest()
+	t := numFind.ReplaceAllStringFunc(s, func(t string) string {
+		var u strings.Builder
+		for _, j := range t {
+			switch j {
+			case '0':
+				u.WriteString("⁰")
+			case '1':
+				u.WriteString("¹")
+			case '2':
+				u.WriteString("²")
+			case '3':
+				u.WriteString("³")
+			case '4':
+				u.WriteString("⁴")
+			case '5':
+				u.WriteString("⁵")
+			case '6':
+				u.WriteString("⁶")
+			case '7':
+				u.WriteString("⁷")
+			case '8':
+				u.WriteString("⁸")
+			case '9':
+				u.WriteString("⁹")
+			}
+		}
+
+		return u.String()
+	})
+	return t
 }
 
 // Multiplies one matrix by another
