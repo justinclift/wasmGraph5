@@ -430,6 +430,7 @@ func keypressHandler(args []js.Value) {
 
 // Pretty formatting of maths strings.  Changes (say) x^3 to x³
 func mathFormat(s string) string {
+	// User superscript numbers
 	numFind := regexp.MustCompile(`\^[0-9]+`)
 	numFind.Longest()
 	t := numFind.ReplaceAllStringFunc(s, func(t string) string {
@@ -458,10 +459,11 @@ func mathFormat(s string) string {
 				u.WriteString("⁹")
 			}
 		}
-
 		return u.String()
 	})
-	return t
+
+	// Strip embedded multiplication signs
+	return strings.Replace(t, "*", "", -1)
 }
 
 // Multiplies one matrix by another
