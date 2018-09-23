@@ -32,6 +32,7 @@ type Object struct {
 	E    []Edge    // List of points to connect by edges
 	S    []Surface // List of points to connect in order, to create a surface
 	Name string
+	Eq   string // Used to store the equation for graph and derivative objects
 }
 
 type OperationType int
@@ -175,9 +176,11 @@ func main() {
 	// Create a graph object with the main data points on it
 	// TODO: Allow user input of equation to graph
 	//eqStr = "x^2"
-	//eqStr = "x^3"
-	eqStr = "(x^3)/2"
-	var firstDeriv, graph Object
+	eqStr = "x^3"
+	//eqStr = "x^4" // Eventually does display stuff, but takes about 1 minute before anything appears
+	//eqStr = "(x^3)/2"
+	//eqStr = "(3/2)*x^2"
+	var graph Object
 	var p Point
 	errOccurred := false
 	graphLabeled := false
@@ -213,55 +216,101 @@ func main() {
 	} else {
 		graph.C = "blue"
 	}
-	graph.Name = "graph"
+	graph.Name = "Equation"
+	graph.Eq = fmt.Sprintf("y = %s", eqStr)
 	worldSpace = append(worldSpace, importObject(graph, 0.0, 0.0, 0.0))
 
-	// Retrieve the human readable string for the 1st order derivative
-	tmpStr := fmt.Sprintf("D[%s, x]", eqStr)
-	tmpState := eq.NewEvalState()
-	tmpExpr := eq.Interp(tmpStr, tmpState)
-	tmpResult := tmpExpr.Eval(tmpState)
-	tmpResult = tmpState.ProcessTopLevelResult(tmpExpr, tmpResult)
-	derivStr = tmpResult.StringForm(eq.ActualStringFormArgsFull("OutputForm", tmpState))
+	// Graph the derivatives of the equation
+	derivNum := 1
+	straightLine := true
+	for derivNum == 1 || straightLine != true { // Make sure at least one derivative gets calculated
+		straightLine = true // The slope check further on will toggle this back off if the derivative isn't a straight line
 
-	// Create a graph object with the 1st order derivative points on it
-	var derivEq string
-	var derivExpr, derivResult eq.Ex
-	errOccurred = false
-	graphLabeled = false
-	derivState := eq.NewEvalState()
-	for x := -2.1; x <= 2.1; x += pointStep {
-		derivEq = fmt.Sprintf("D[%s,x] /. x -> %.2f", eqStr, x)
-		derivExpr = eq.Interp(derivEq, derivState)
-		derivResult = derivExpr.Eval(derivState)
-		derivResult = derivState.ProcessTopLevelResult(derivExpr, derivResult)
-		tmp := derivResult.StringForm(eq.ActualStringFormArgsFull("OutputForm", derivState))
-		if debug {
-			fmt.Printf("Val: %0.2f Derivative String: %v Result: %v\n", x, derivStr, tmp)
-		}
-		y, err := strconv.ParseFloat(tmp, 64)
-		if err != nil {
-			y = -1 // Set this to -1 to visually indicate something went wrong
-			errOccurred = true
-			fmt.Printf("Error: %v\n", err)
-		}
-		p = Point{X: x, Y: y}
-		if !graphLabeled {
-			p.Label = fmt.Sprintf(" 1st order derivative: y = %s ", derivStr)
-			p.LabelAlign = "right"
-			graphLabeled = true
-		}
-		firstDeriv.P = append(firstDeriv.P, p)
-	}
-	if errOccurred {
-		firstDeriv.C = "red" // Draw the line in red if an error occurred with the calculation
-	} else {
-		firstDeriv.C = "green"
-	}
-	firstDeriv.Name = "firstDeriv"
-	worldSpace = append(worldSpace, importObject(firstDeriv, 0.0, 0.0, 0.0))
+		// Retrieve the human readable string for the derivative
+		tmpStr := fmt.Sprintf("D[%s, x]", eqStr)
+		tmpState := eq.NewEvalState()
+		tmpExpr := eq.Interp(tmpStr, tmpState)
+		tmpResult := tmpExpr.Eval(tmpState)
+		tmpResult = tmpState.ProcessTopLevelResult(tmpExpr, tmpResult)
+		derivStr = tmpResult.StringForm(eq.ActualStringFormArgsFull("OutputForm", tmpState))
 
-	// TODO: Generate points for the 2nd+ order derivatives?
+		// Variables used to determine if the derivative is a straight line
+		gotSlope := false
+		gotFirstPoint := false
+		var slope, slope2, slopeP1, slopeP2 float64
+
+		// Create a graph object with the derivative points on it
+		errOccurred = false
+		graphLabeled = false
+		derivState := eq.NewEvalState()
+		var deriv Object
+		var derivExpr, derivResult eq.Ex
+		for x := -2.1; x <= 2.1; x += pointStep {
+			derivEq := fmt.Sprintf("D[%s,x] /. x -> %.2f", eqStr, x)
+			derivExpr = eq.Interp(derivEq, derivState)
+			derivResult = derivExpr.Eval(derivState)
+			derivResult = derivState.ProcessTopLevelResult(derivExpr, derivResult)
+			tmp := derivResult.StringForm(eq.ActualStringFormArgsFull("OutputForm", derivState))
+			if debug {
+				fmt.Printf("Val: %0.2f Derivative String: %v Result: %v\n", x, derivStr, tmp)
+			}
+			y, err := strconv.ParseFloat(tmp, 64)
+			if err != nil {
+				y = -1 // Set this to -1 to visually indicate something went wrong
+				errOccurred = true
+				fmt.Printf("Error: %v\n", err)
+			}
+
+			// Determine if the derivative is a straight line
+			if !gotSlope {
+				if !gotFirstPoint {
+					slopeP1 = math.Round(y*10000) / 10000 // Round off, but keep a few decimal places of precision
+					gotFirstPoint = true
+				} else {
+					slopeP2 = math.Round(y*10000) / 10000
+					riseOverRun := (slopeP2 - slopeP1) / pointStep
+					slope = math.Round(riseOverRun*10000) / 10000
+					if debug {
+						fmt.Printf("Slope: (%v - %v) / %v = %v\n", slopeP2, slopeP1, pointStep, slope)
+					}
+					slopeP1 = slopeP2
+					gotSlope = true
+				}
+			} else {
+				slopeP2 = math.Round(y*10000) / 10000
+				riseOverRun := (slopeP2 - slopeP1) / pointStep
+				slope2 = math.Round(riseOverRun*10000) / 10000
+				if debug {
+					fmt.Printf("Slope2: (%v - %v) / %v = %v", slopeP2, slopeP1, pointStep, slope2)
+				}
+				slopeP1 = slopeP2
+				if slope != slope2 {
+					straightLine = false
+				}
+				if debug {
+					fmt.Printf(" Straight line: %v\n", straightLine)
+				}
+			}
+
+			p = Point{X: x, Y: y}
+			if !graphLabeled {
+				p.Label = fmt.Sprintf(" %s order derivative: y = %s ", strDeriv(derivNum), derivStr)
+				p.LabelAlign = "right"
+				graphLabeled = true
+			}
+			deriv.P = append(deriv.P, p)
+		}
+		if errOccurred {
+			deriv.C = "red" // Draw the line in red if an error occurred with the calculation
+		} else {
+			deriv.C = colDeriv(derivNum)
+		}
+		deriv.Name = fmt.Sprintf("%s order derivative", strDeriv(derivNum))
+		deriv.Eq = fmt.Sprintf("y = %s", derivStr)
+		worldSpace = append(worldSpace, importObject(deriv, 0.0, 0.0, 0.0))
+		eqStr = derivStr
+		derivNum++
+	}
 
 	// Keep the application running
 	done := make(chan struct{}, 0)
@@ -287,6 +336,20 @@ func clickHandler(args []js.Value) {
 			// Couldn't open a new window, so try loading directly in the existing one instead
 			doc.Set("location", sourceURL)
 		}
+	}
+}
+
+// Returns the colour to use for a derivative
+func colDeriv(i int) string {
+	switch i {
+	case 1:
+		return "green"
+	case 2:
+		return "darkgoldenrod"
+	case 3:
+		return "chocolate"
+	default:
+		return "black"
 	}
 }
 
@@ -317,6 +380,7 @@ func importObject(ob Object, x float64, y float64, z float64) (translatedObject 
 	// Copy the remaining object info across
 	translatedObject.C = ob.C
 	translatedObject.Name = ob.Name
+	translatedObject.Eq = ob.Eq
 	for _, j := range ob.E {
 		translatedObject.E = append(translatedObject.E, j)
 	}
@@ -537,7 +601,6 @@ func renderFrame(args []js.Value) {
 	ctx.Set("lineWidth", "1")
 	ctx.Call("setLineDash", []interface{}{})
 	for _, o := range worldSpace {
-
 		// Draw the surfaces
 		ctx.Set("fillStyle", o.C)
 		for _, l := range o.S {
@@ -642,19 +705,17 @@ func renderFrame(args []js.Value) {
 
 	// Add the graph and derivatives information
 	ctx.Set("fillStyle", "black")
-	ctx.Set("font", "bold 18px serif")
-	ctx.Call("fillText", "Equation", graphWidth+20, textY)
-	textY += 20
-	ctx.Set("font", "16px sans-serif")
-	ctx.Call("fillText", eqStr, graphWidth+40, textY)
-	textY += 30
-
-	// Add the derivatives information
-	ctx.Set("font", "bold 18px serif")
-	ctx.Call("fillText", "1st order derivative", graphWidth+20, textY)
-	textY += 20
-	ctx.Set("font", "16px sans-serif")
-	ctx.Call("fillText", fmt.Sprintf("y = %s", derivStr), graphWidth+40, textY)
+	for i := 0; i < numWld; i++ {
+		o := worldSpace[i]
+		if o.Name != "axes" {
+			ctx.Set("font", "bold 18px serif")
+			ctx.Call("fillText", o.Name, graphWidth+20, textY)
+			textY += 20
+			ctx.Set("font", "16px sans-serif")
+			ctx.Call("fillText", o.Eq, graphWidth+40, textY)
+			textY += 30
+		}
+	}
 
 	// Clear the source code link area
 	ctx.Set("fillStyle", "white")
@@ -742,6 +803,20 @@ func scale(m matrix, x float64, y float64, z float64) matrix {
 		0, 0, 0, 1,
 	}
 	return matrixMult(scaleMatrix, m)
+}
+
+// Returns the name/label prefix for a derivative string
+func strDeriv(i int) string {
+	switch i {
+	case 1:
+		return "1st"
+	case 2:
+		return "2nd"
+	case 3:
+		return "3rd"
+	default:
+		return fmt.Sprintf("%dth", i)
+	}
 }
 
 // Transform the XYZ co-ordinates using the values from the transformation matrix
