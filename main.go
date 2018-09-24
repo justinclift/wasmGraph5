@@ -59,10 +59,9 @@ const (
 )
 
 var (
-	// TODO: Allow user input of equation to graph
 	//eqStr = "x^2"
-	eqStr = "x^3"
-	//eqStr = "x^4" // Eventually does display stuff, but takes about 1 minute before anything appears
+	eqStr = "x^3" // The default equation to graph
+	//eqStr = "x^4" // Eventually does display, but takes about 1 minute before anything appears
 	//eqStr = "(x^3)/2"
 	//eqStr = "(3/2)*x^2"
 
@@ -159,18 +158,18 @@ func main() {
 
 	// Set up the mouse click handler
 	cCall = js.NewCallback(clickHandler)
-	doc.Call("addEventListener", "mousedown", cCall)
+	canvasEl.Call("addEventListener", "mousedown", cCall)
 	defer cCall.Release()
 
 	// Set up the keypress handler
 	renderActive = atomic.NewBool(false)
 	kCall = js.NewCallback(keypressHandler)
-	doc.Call("addEventListener", "keydown", kCall)
+	canvasEl.Call("addEventListener", "keydown", kCall)
 	defer kCall.Release()
 
 	// Set up the mouse move handler
 	mCall = js.NewCallback(moveHandler)
-	doc.Call("addEventListener", "mousemove", mCall)
+	canvasEl.Call("addEventListener", "mousemove", mCall)
 	defer mCall.Release()
 
 	// Set the frame renderer going
@@ -180,14 +179,79 @@ func main() {
 
 	// Set up the mouse wheel handler
 	wCall = js.NewCallback(wheelHandler)
-	doc.Call("addEventListener", "wheel", wCall)
+	canvasEl.Call("addEventListener", "wheel", wCall)
 	defer wCall.Release()
 
 	// Set the operations processor going
 	queue = make(chan Operation)
 	go processOperations(queue)
 
+	// Create the graph objects for the equation and its derivative
+	generateGraphAndDerives(eqStr)
+
+	// Keep the application running
+	done := make(chan struct{}, 0)
+	<-done
+}
+
+// Simple handler for mouse click events on the "Graph it" button
+func buttonHandler(args []js.Value) {
+	// Retrieve the new equation for graphing
+	newEq := equationEl.Get("value").String()
+	if debug {
+		fmt.Printf("%v\n", newEq)
+	}
+
+	// TODO: Input validation
+	//       * Acceptable char list -> x +-*/ ^ 0-9 and space char sounds like a reasonable start
+
+	// Create new graph and derivative objects
+	generateGraphAndDerives(newEq)
+}
+
+// Simple mouse handler watching for people clicking on the source code link
+func clickHandler(args []js.Value) {
+	event := args[0]
+	clientX := event.Get("clientX").Float()
+	clientY := event.Get("clientY").Float()
+	if debug {
+		fmt.Printf("ClientX: %v  clientY: %v\n", clientX, clientY)
+		if clientX > graphWidth && clientY > (height-40) {
+			println("URL hit!")
+		}
+	}
+
+	// If the user clicks the source code URL area, open the URL
+	if clientX > graphWidth && clientY > (height-40) {
+		w := js.Global().Call("open", sourceURL)
+		if w == js.Null() {
+			// Couldn't open a new window, so try loading directly in the existing one instead
+			doc.Set("location", sourceURL)
+		}
+	}
+}
+
+// Returns the colour to use for a derivative
+func colDeriv(i int) string {
+	switch i {
+	case 1:
+		return "green"
+	case 2:
+		return "darkgoldenrod"
+	case 3:
+		return "chocolate"
+	default:
+		return "black"
+	}
+}
+
+// Generates the graph and derivatives for a given equation
+func generateGraphAndDerives(newEq string) {
+	// Initialise the transform matrix with the identity matrix
+	transformMatrix = identityMatrix
+
 	// Add the X/Y axes object to the world space
+	worldSpace = []Object{}
 	worldSpace = append(worldSpace, importObject(axes, 0.0, 0.0, 0.0))
 
 	// Create a graph object with the main data points on it
@@ -196,7 +260,7 @@ func main() {
 	errOccurred := false
 	graphLabeled := false
 	evalState := eq.NewEvalState()
-	expr := eq.Interp(fmt.Sprintf("f[x_] := %s", eqStr), evalState)
+	expr := eq.Interp(fmt.Sprintf("f[x_] := %s", newEq), evalState)
 	result := expr.Eval(evalState)
 	result = evalState.ProcessTopLevelResult(expr, result)
 	for x := -2.1; x <= 2.1; x += 0.05 {
@@ -214,7 +278,7 @@ func main() {
 		}
 		p = Point{X: x, Y: y}
 		if !graphLabeled {
-			p.Label = fmt.Sprintf(" Equation: y = %s ", mathFormat(eqStr))
+			p.Label = fmt.Sprintf(" Equation: y = %s ", mathFormat(newEq))
 			p.LabelAlign = "right"
 			graphLabeled = true
 		}
@@ -226,7 +290,7 @@ func main() {
 		graph.C = "blue"
 	}
 	graph.Name = "Equation"
-	graph.Eq = fmt.Sprintf("y = %s", mathFormat(eqStr))
+	graph.Eq = fmt.Sprintf("y = %s", mathFormat(newEq))
 	worldSpace = append(worldSpace, importObject(graph, 0.0, 0.0, 0.0))
 
 	// Graph the derivatives of the equation
@@ -236,7 +300,7 @@ func main() {
 		straightLine = true // The slope check further on will toggle this back off if the derivative isn't a straight line
 
 		// Retrieve the human readable string for the derivative
-		tmpStr := fmt.Sprintf("D[%s, x]", eqStr)
+		tmpStr := fmt.Sprintf("D[%s, x]", newEq)
 		tmpState := eq.NewEvalState()
 		tmpExpr := eq.Interp(tmpStr, tmpState)
 		tmpResult := tmpExpr.Eval(tmpState)
@@ -255,7 +319,7 @@ func main() {
 		var deriv Object
 		var derivExpr, derivResult eq.Ex
 		for x := -2.1; x <= 2.1; x += pointStep {
-			derivEq := fmt.Sprintf("D[%s,x] /. x -> %.2f", eqStr, x)
+			derivEq := fmt.Sprintf("D[%s,x] /. x -> %.2f", newEq, x)
 			derivExpr = eq.Interp(derivEq, derivState)
 			derivResult = derivExpr.Eval(derivState)
 			derivResult = derivState.ProcessTopLevelResult(derivExpr, derivResult)
@@ -317,53 +381,8 @@ func main() {
 		deriv.Name = fmt.Sprintf("%s order derivative", strDeriv(derivNum))
 		deriv.Eq = fmt.Sprintf("y = %s", mathFormat(derivStr))
 		worldSpace = append(worldSpace, importObject(deriv, 0.0, 0.0, 0.0))
-		eqStr = derivStr
+		newEq = derivStr
 		derivNum++
-	}
-
-	// Keep the application running
-	done := make(chan struct{}, 0)
-	<-done
-}
-
-// Simple handler for mouse click events on the "Graph it" button
-func buttonHandler(args []js.Value) {
-	fmt.Println("Graph it button clicked")
-}
-
-// Simple mouse handler watching for people clicking on the source code link
-func clickHandler(args []js.Value) {
-	event := args[0]
-	clientX := event.Get("clientX").Float()
-	clientY := event.Get("clientY").Float()
-	if debug {
-		fmt.Printf("ClientX: %v  clientY: %v\n", clientX, clientY)
-		if clientX > graphWidth && clientY > (height-40) {
-			println("URL hit!")
-		}
-	}
-
-	// If the user clicks the source code URL area, open the URL
-	if clientX > graphWidth && clientY > (height-40) {
-		w := js.Global().Call("open", sourceURL)
-		if w == js.Null() {
-			// Couldn't open a new window, so try loading directly in the existing one instead
-			doc.Set("location", sourceURL)
-		}
-	}
-}
-
-// Returns the colour to use for a derivative
-func colDeriv(i int) string {
-	switch i {
-	case 1:
-		return "green"
-	case 2:
-		return "darkgoldenrod"
-	case 3:
-		return "chocolate"
-	default:
-		return "black"
 	}
 }
 
