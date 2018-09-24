@@ -59,6 +59,13 @@ const (
 )
 
 var (
+	// TODO: Allow user input of equation to graph
+	//eqStr = "x^2"
+	eqStr = "x^3"
+	//eqStr = "x^4" // Eventually does display stuff, but takes about 1 minute before anything appears
+	//eqStr = "(x^3)/2"
+	//eqStr = "(3/2)*x^2"
+
 	// The empty world space
 	worldSpace []Object
 
@@ -124,7 +131,7 @@ var (
 	cCall, kCall, mCall js.Callback
 	rCall, wCall        js.Callback
 	ctx, doc, canvasEl  js.Value
-	eqStr, derivStr     string
+	derivStr            string
 	opText              string
 	highLightSource     bool
 	pointStep           = 0.05
@@ -176,12 +183,6 @@ func main() {
 	worldSpace = append(worldSpace, importObject(axes, 0.0, 0.0, 0.0))
 
 	// Create a graph object with the main data points on it
-	// TODO: Allow user input of equation to graph
-	//eqStr = "x^2"
-	eqStr = "x^3"
-	//eqStr = "x^4" // Eventually does display stuff, but takes about 1 minute before anything appears
-	//eqStr = "(x^3)/2"
-	//eqStr = "(3/2)*x^2"
 	var graph Object
 	var p Point
 	errOccurred := false
