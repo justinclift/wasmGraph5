@@ -129,8 +129,8 @@ var (
 	graphHeight         float64
 	cCall, kCall, mCall js.Callback
 	rCall, wCall        js.Callback
-	ctx, doc, canvasEl  js.Value
-	btnEl, equationEl   js.Value
+	ctx, doc            js.Value
+	btnEl, canvasEl     js.Value
 	derivStr            string
 	opText              string
 	highLightSource     bool
@@ -150,7 +150,6 @@ func main() {
 	ctx = canvasEl.Call("getContext", "2d")
 
 	// Set up handler for clicks on the "Graph it" button
-	equationEl = doc.Call("getElementById", "equation")
 	btnEl = doc.Call("getElementById", "update")
 	btnCall := js.NewCallback(buttonHandler)
 	btnEl.Call("addEventListener", "click", btnCall)
@@ -197,13 +196,37 @@ func main() {
 // Simple handler for mouse click events on the "Graph it" button
 func buttonHandler(args []js.Value) {
 	// Retrieve the new equation for graphing
+	equationEl := doc.Call("getElementById", "equation")
 	newEq := equationEl.Get("value").String()
 	if debug {
 		fmt.Printf("%v\n", newEq)
 	}
 
-	// TODO: Input validation
-	//       * Acceptable char list -> x +-*/ ^ 0-9 and space char sounds like a reasonable start
+	// Input validation
+	errEl := doc.Call("getElementById", "errmsg")
+	charEl := doc.Call("getElementById", "errchars")
+	var badChars strings.Builder
+	for _, j := range newEq {
+		switch j {
+		case 'x', '+', '-', '*', '/', '^', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			// The character is valid
+		default:
+			badChars.WriteString(string(j))
+		}
+	}
+	if badChars.String() != "" {
+		// Display error message
+		errEl.Set("style", "color: darkred; display: block;")
+		charEl.Set("innerHTML", badChars.String())
+		if debug {
+			fmt.Printf("Bad characters: %s\n", badChars.String())
+		}
+		return
+	}
+
+	// Clear any existing error message
+	errEl.Set("style", "color: darkred; display: none;")
+	charEl.Set("innerHTML", "")
 
 	// Create new graph and derivative objects
 	generateGraphAndDerives(newEq)
