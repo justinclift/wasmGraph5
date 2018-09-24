@@ -131,6 +131,7 @@ var (
 	cCall, kCall, mCall js.Callback
 	rCall, wCall        js.Callback
 	ctx, doc, canvasEl  js.Value
+	btnEl, equationEl   js.Value
 	derivStr            string
 	opText              string
 	highLightSource     bool
@@ -148,6 +149,13 @@ func main() {
 	canvasEl.Call("setAttribute", "height", height)
 	canvasEl.Set("tabIndex", 0) // Not sure if this is needed
 	ctx = canvasEl.Call("getContext", "2d")
+
+	// Set up handler for clicks on the "Graph it" button
+	equationEl = doc.Call("getElementById", "equation")
+	btnEl = doc.Call("getElementById", "update")
+	btnCall := js.NewCallback(buttonHandler)
+	btnEl.Call("addEventListener", "click", btnCall)
+	defer btnCall.Release()
 
 	// Set up the mouse click handler
 	cCall = js.NewCallback(clickHandler)
@@ -316,6 +324,11 @@ func main() {
 	// Keep the application running
 	done := make(chan struct{}, 0)
 	<-done
+}
+
+// Simple handler for mouse click events on the "Graph it" button
+func buttonHandler(args []js.Value) {
+	fmt.Println("Graph it button clicked")
 }
 
 // Simple mouse handler watching for people clicking on the source code link
