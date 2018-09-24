@@ -208,7 +208,7 @@ func buttonHandler(args []js.Value) {
 	var badChars strings.Builder
 	for _, j := range newEq {
 		switch j {
-		case 'x', '+', '-', '*', '/', '^', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		case 'x', '+', '-', '*', '/', '^', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '(', ')', '[', ']':
 			// The character is valid
 		default:
 			badChars.WriteString(string(j))
@@ -216,7 +216,7 @@ func buttonHandler(args []js.Value) {
 	}
 	if badChars.String() != "" {
 		// Display error message
-		errEl.Set("style", "color: darkred; display: block;")
+		errEl.Set("style", "display: block;")
 		charEl.Set("innerHTML", badChars.String())
 		if debug {
 			fmt.Printf("Bad characters: %s\n", badChars.String())
@@ -225,7 +225,7 @@ func buttonHandler(args []js.Value) {
 	}
 
 	// Clear any existing error message
-	errEl.Set("style", "color: darkred; display: none;")
+	errEl.Set("style", "display: none;")
 	charEl.Set("innerHTML", "")
 
 	// Create new graph and derivative objects
