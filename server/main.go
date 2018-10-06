@@ -1,13 +1,13 @@
 package main
 
 // A simple server to return derivatives and basic solved equations to the wasmGraph5 front end
-//   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/deriv/?eq=x^2
 
 import (
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	eq "github.com/corywalker/expreduce/expreduce"
@@ -19,39 +19,30 @@ var (
 
 func main() {
 	http.HandleFunc("/deriv/", derivHandler)
+	http.HandleFunc("/solve/", solveHandler)
 	err := http.ListenAndServe("0.0.0.0:8080", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
+// Returns the derivative for a given input equation string
+//   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/deriv/?eq=x^2
 func derivHandler (w http.ResponseWriter, r *http.Request) {
 	// Retrieve the potential equation string
 	inp := r.FormValue("eq")
 	if debug {
-		fmt.Printf("String '%v' received\n", inp)
+		fmt.Printf("Derivative input '%v' received\n", inp)
 	}
 
 	// Input validation
-	var badChars, newEq strings.Builder
-	for _, j := range inp {
-		switch j {
-		case 'x', '+', '-', '*', '/', '^', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '(', ')', '[', ']':
-			// The character is valid
-			newEq.WriteRune(j)
-		default:
-			// The character is NOT valid
-			badChars.WriteRune(j)
-		}
-	}
-	if badChars.String() != "" {
-		// Return an appropriate error message
-		resp := fmt.Sprintf("Bad character(s) in equation input string: %s\n", badChars.String())
-		http.Error(w, resp, http.StatusInternalServerError)
+	newEq, err := validate(inp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 
 		// Display message on server console
 		if debug {
-			fmt.Println(resp)
+			fmt.Println(err.Error())
 		}
 		return
 	}
@@ -69,4 +60,76 @@ func derivHandler (w http.ResponseWriter, r *http.Request) {
 	if debug {
 		fmt.Printf("Equation: '%v' - Derivative: '%v'\n", newEq.String(), deriv)
 	}
+}
+
+// Returns the solved equation for a given input equation string + value
+//   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/solve/?eq=x^2&val=2.0
+func solveHandler (w http.ResponseWriter, r *http.Request) {
+	// Retrieve the potential equation string and value
+	inpEq := r.FormValue("eq")
+	inpVal := r.FormValue("val")
+	if debug {
+		fmt.Printf("Solve input: equation '%v' with value '%v' received\n", inpEq, inpVal)
+	}
+
+	// Validate equation string
+	newEq, err := validate(inpEq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		if debug {
+			fmt.Println(err.Error())
+		}
+		return
+	}
+
+	// Validate floating point value string
+	val, err := strconv.ParseFloat(inpVal, 64)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		if debug {
+			fmt.Println(err.Error())
+		}
+		return
+	}
+
+	// Solve the equation
+	str := fmt.Sprintf("f[x_] := %s", newEq.String())
+	state := eq.NewEvalState()
+	expr := eq.Interp(str, state)
+	part1 := expr.Eval(state)
+	part1 = state.ProcessTopLevelResult(expr, part1)
+	expr = eq.Interp(fmt.Sprintf("x=%.2f", val), state)
+	part2 := expr.Eval(state)
+	part2 = state.ProcessTopLevelResult(expr, part2)
+	expr = eq.Interp("f[x]", state)
+	part2 = expr.Eval(state)
+	part2 = state.ProcessTopLevelResult(expr, part2)
+	result := part2.StringForm(eq.ActualStringFormArgsFull("InputForm", state))
+	io.WriteString(w, result)
+
+	// Print the equation, value and result to the server console
+	if debug {
+		fmt.Printf("Equation: '%v', value: '%v' - Result: '%v'\n", newEq.String(), val, result)
+	}
+}
+
+// Validates an input string
+func validate(s string) (newEq strings.Builder, err error) {
+	var badChars strings.Builder
+	for _, j := range s {
+		switch j {
+		case 'x', '+', '-', '*', '/', '^', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '(', ')', '[', ']':
+			// The character is valid
+			newEq.WriteRune(j)
+		default:
+			// The character is NOT valid
+			badChars.WriteRune(j)
+		}
+	}
+	if badChars.String() != "" {
+		// Return an appropriate error message
+		err = fmt.Errorf("bad character(s) in equation input string: %s", badChars.String())
+		return
+	}
+	return
 }
