@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	eq "github.com/corywalker/expreduce/expreduce"
+	"github.com/husobee/vestigo"
 )
 
 var (
@@ -18,10 +20,19 @@ var (
 )
 
 func main() {
-	http.HandleFunc("/derivstr/", derivStrHandler)
-	http.HandleFunc("/solvederiv/", solveDerivHandler)
-	http.HandleFunc("/solveeq/", solveEqHandler)
-	err := http.ListenAndServe("0.0.0.0:8080", nil)
+	router := vestigo.NewRouter()
+	// TODO: Learn what these CORS settings actually do
+	router.SetGlobalCors(&vestigo.CorsAccessControl{
+		AllowOrigin:      []string{"*"},
+		AllowCredentials: true,
+		ExposeHeaders:    []string{"X-Header", "X-Y-Header"},
+		MaxAge:           3600 * time.Second,
+		AllowHeaders:     []string{"X-Header", "X-Y-Header"},
+	})
+	router.Get("/derivstr/", derivStrHandler)
+	router.Get("/solvederiv/", solveDerivHandler)
+	router.Get("/solveeq/", solveEqHandler)
+	err := http.ListenAndServe("0.0.0.0:8080", router)
 	if err != nil {
 		log.Fatal(err)
 	}

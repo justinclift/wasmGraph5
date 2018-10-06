@@ -6,14 +6,15 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"syscall/js"
 	"time"
 
-	eq "github.com/corywalker/expreduce/expreduce"
 	"go.uber.org/atomic"
 )
 
@@ -57,6 +58,7 @@ type Operation struct {
 }
 
 const (
+	server    = "0.0.0.0:8080"
 	sourceURL = "https://github.com/justinclift/wasmGraph5"
 )
 
@@ -284,18 +286,8 @@ func generateGraphAndDerives(newEq string) {
 	var p Point
 	errOccurred := false
 	graphLabeled := false
-	evalState := eq.NewEvalState()
-	expr := eq.Interp(fmt.Sprintf("f[x_] := %s", newEq), evalState)
-	result := expr.Eval(evalState)
-	result = evalState.ProcessTopLevelResult(expr, result)
 	for x := -2.1; x <= 2.1; x += 0.05 {
-		expr = eq.Interp(fmt.Sprintf("x=%.2f", x), evalState)
-		result := expr.Eval(evalState)
-		result = evalState.ProcessTopLevelResult(expr, result)
-		expr = eq.Interp("f[x]", evalState)
-		result = expr.Eval(evalState)
-		result = evalState.ProcessTopLevelResult(expr, result)
-		y, err := strconv.ParseFloat(result.StringForm(eq.ActualStringFormArgsFull("InputForm", evalState)), 64)
+		y, err := solveEquation(newEq, x)
 		if err != nil {
 			y = -1 // Set this to -1 to visually indicate something went wrong
 			errOccurred = true
@@ -325,12 +317,7 @@ func generateGraphAndDerives(newEq string) {
 		straightLine = true // The slope check further on will toggle this back off if the derivative isn't a straight line
 
 		// Retrieve the human readable string for the derivative
-		tmpStr := fmt.Sprintf("D[%s, x]", newEq)
-		tmpState := eq.NewEvalState()
-		tmpExpr := eq.Interp(tmpStr, tmpState)
-		tmpResult := tmpExpr.Eval(tmpState)
-		tmpResult = tmpState.ProcessTopLevelResult(tmpExpr, tmpResult)
-		derivStr = tmpResult.StringForm(eq.ActualStringFormArgsFull("OutputForm", tmpState))
+		derivStr, _ := retrieveDerivativeString(newEq)
 
 		// Variables used to determine if the derivative is a straight line
 		gotSlope := false
@@ -340,23 +327,16 @@ func generateGraphAndDerives(newEq string) {
 		// Create a graph object with the derivative points on it
 		errOccurred = false
 		graphLabeled = false
-		derivState := eq.NewEvalState()
 		var deriv Object
-		var derivExpr, derivResult eq.Ex
 		for x := -2.1; x <= 2.1; x += pointStep {
-			derivEq := fmt.Sprintf("D[%s,x] /. x -> %.2f", newEq, x)
-			derivExpr = eq.Interp(derivEq, derivState)
-			derivResult = derivExpr.Eval(derivState)
-			derivResult = derivState.ProcessTopLevelResult(derivExpr, derivResult)
-			tmp := derivResult.StringForm(eq.ActualStringFormArgsFull("OutputForm", derivState))
-			if debug {
-				fmt.Printf("Val: %0.2f Derivative String: %v Result: %v\n", x, derivStr, tmp)
-			}
-			y, err := strconv.ParseFloat(tmp, 64)
+			y, err := solveDerivative(newEq, x)
 			if err != nil {
 				y = -1 // Set this to -1 to visually indicate something went wrong
 				errOccurred = true
 				fmt.Printf("Error: %v\n", err)
+			}
+			if debug {
+				fmt.Printf("Val: %0.2f Derivative String: %v Result: %v\n", x, derivStr, y)
 			}
 
 			// Determine if the derivative is a straight line
@@ -854,6 +834,23 @@ func renderFrame(args []js.Value) {
 	js.Global().Call("requestAnimationFrame", rCall)
 }
 
+// Calls the backend server, retrieving the derivative formula for an equation
+func retrieveDerivativeString(eq string) (string, error) {
+	query := fmt.Sprintf("http://%s/derivstr/?eq=%v", server, eq)
+	if debug {
+		fmt.Printf("Solve backend query: %v\n", query)
+	}
+	res, err := http.Get(query)
+	if err != nil {
+		return "error", err
+	}
+	s, _ := ioutil.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK {
+		return "error", fmt.Errorf(string(s))
+	}
+	return string(s), nil
+}
+
 // Rotates a transformation matrix around the X axis by the given degrees
 func rotateAroundX(m matrix, degrees float64) matrix {
 	rad := (math.Pi / 180) * degrees // The Go math functions use radians, so we convert degrees to radians
@@ -899,6 +896,48 @@ func scale(m matrix, x float64, y float64, z float64) matrix {
 		0, 0, 0, 1,
 	}
 	return matrixMult(scaleMatrix, m)
+}
+
+// Calls the backend server, retrieving the derivative for a given equation and input variable
+func solveDerivative(eq string, val float64) (float64, error) {
+	query := fmt.Sprintf("http://%s/solvederiv/?eq=%v&val=%.4f", server, eq, val)
+	if debug {
+		fmt.Printf("Solve backend query: %v\n", query)
+	}
+	res, err := http.Get(query)
+	if err != nil {
+		return -1.0, err
+	}
+	s, _ := ioutil.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK {
+		return -1.0, fmt.Errorf(string(s))
+	}
+	answer, err := strconv.ParseFloat(string(s), 64)
+	if err != nil {
+		return -1.0, err
+	}
+	return answer, nil
+}
+
+// Calls the backend server, retrieving the answer for a given equation and input variable
+func solveEquation(eq string, val float64) (float64, error) {
+	query := fmt.Sprintf("http://%s/solveeq/?eq=%v&val=%.4f", server, eq, val)
+	if debug {
+		fmt.Printf("Solve backend query: %v\n", query)
+	}
+	res, err := http.Get(query)
+	if err != nil {
+		return -1.0, err
+	}
+	s, _ := ioutil.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK {
+		return -1.0, fmt.Errorf(string(s))
+	}
+	answer, err := strconv.ParseFloat(string(s), 64)
+	if err != nil {
+		return -1.0, err
+	}
+	return answer, nil
 }
 
 // Returns the name/label prefix for a derivative string
