@@ -14,21 +14,22 @@ import (
 )
 
 var (
-	debug               = true // If true, some debugging info is printed to the javascript console
+	debug = true // If true, some debugging info is printed to the javascript console
 )
 
 func main() {
-	http.HandleFunc("/deriv/", derivHandler)
-	http.HandleFunc("/solve/", solveHandler)
+	http.HandleFunc("/derivstr/", derivStrHandler)
+	http.HandleFunc("/solvederiv/", solveDerivHandler)
+	http.HandleFunc("/solveeq/", solveEqHandler)
 	err := http.ListenAndServe("0.0.0.0:8080", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-// Returns the derivative for a given input equation string
-//   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/deriv/?eq=x^2
-func derivHandler (w http.ResponseWriter, r *http.Request) {
+// Returns the derivative string for a given input equation string
+//   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/derivstr/?eq=x^2
+func derivStrHandler(w http.ResponseWriter, r *http.Request) {
 	// Retrieve the potential equation string
 	inp := r.FormValue("eq")
 	if debug {
@@ -62,9 +63,54 @@ func derivHandler (w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Returns the derivative for a given input equation string + value
+//   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/solvederiv/?eq=x^2&val=2.0
+func solveDerivHandler(w http.ResponseWriter, r *http.Request) {
+	// Retrieve the potential equation string and value
+	inpEq := r.FormValue("eq")
+	inpVal := r.FormValue("val")
+	if debug {
+		fmt.Printf("Derivative input: equation '%v' with value '%v' received\n", inpEq, inpVal)
+	}
+
+	// Validate equation string
+	newEq, err := validate(inpEq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		if debug {
+			fmt.Println(err.Error())
+		}
+		return
+	}
+
+	// Validate floating point value string
+	val, err := strconv.ParseFloat(inpVal, 64)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		if debug {
+			fmt.Println(err.Error())
+		}
+		return
+	}
+
+	// Solve the derivative equation
+	str := fmt.Sprintf("D[%s,x] /. x -> %.2f", newEq.String(), val)
+	state := eq.NewEvalState()
+	expr := eq.Interp(str, state)
+	result := expr.Eval(state)
+	result = state.ProcessTopLevelResult(expr, result)
+	solve := result.StringForm(eq.ActualStringFormArgsFull("OutputForm", state))
+	io.WriteString(w, solve)
+
+	// Print the equation, value and result to the server console
+	if debug {
+		fmt.Printf("Derivative equation: '%v', value: '%v' - Result: '%v'\n", newEq.String(), val, solve)
+	}
+}
+
 // Returns the solved equation for a given input equation string + value
-//   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/solve/?eq=x^2&val=2.0
-func solveHandler (w http.ResponseWriter, r *http.Request) {
+//   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/solveeq/?eq=x^2&val=2.0
+func solveEqHandler(w http.ResponseWriter, r *http.Request) {
 	// Retrieve the potential equation string and value
 	inpEq := r.FormValue("eq")
 	inpVal := r.FormValue("val")
