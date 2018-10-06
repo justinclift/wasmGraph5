@@ -2,6 +2,8 @@
 // compile: GOOS=js GOARCH=wasm go build -o main.wasm ./main.go
 package main
 
+// TODO: Investigate how to compress wasm files, and serve them correctly from GitHub, Caddy, etc
+
 import (
 	"fmt"
 	"math"
