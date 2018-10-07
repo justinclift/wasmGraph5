@@ -3,6 +3,10 @@
 package main
 
 // TODO: Investigate how to compress wasm files, and serve them correctly from GitHub, Caddy, etc
+// TODO: Setup a super basic online server (Scaleway?) so the frontend will work for anyone (use HTTPS too)
+// TODO: Merge solveDerivative() & solveEquation() into a single function call (reduce code duplication)
+// TODO: Fix the problem with clicking the "Graph it" button causing a goroutine lock
+//         * The http.Get() call seems to be the cause, but not yet sure why
 
 import (
 	"encoding/json"
@@ -68,8 +72,8 @@ const (
 
 var (
 	//eqStr = "x^2"
-	eqStr = "x^3" // The default equation to graph
-	//eqStr = "x^4" // Eventually does display, but takes about 1 minute before anything appears
+	//eqStr = "x^3"
+	eqStr = "x^4" // The default equation to graph
 	//eqStr = "(x^3)/2"
 	//eqStr = "(3/2)*x^2"
 
@@ -139,7 +143,6 @@ var (
 	rCall, wCall        js.Callback
 	ctx, doc            js.Value
 	btnEl, canvasEl     js.Value
-	derivStr            string
 	opText              string
 	highLightSource     bool
 	pointStep           = 0.05
@@ -909,7 +912,6 @@ func scale(m matrix, x float64, y float64, z float64) matrix {
 }
 
 // Calls the backend server, retrieving the derivative for a given equation and input variable
-// TODO: Probably better to merge solveDerivative() & solveEquation() into a single function call
 func solveDerivative(eq string, min float64, max float64, step float64) (points []serverPoint, err error) {
 	query := fmt.Sprintf("http://%s/solvederiv/?eq=%v&min=%.4f&max=%.4f&step=%.4f", server, eq, min, max, step)
 	if debug {
