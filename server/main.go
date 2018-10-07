@@ -43,7 +43,7 @@ func main() {
 	}
 }
 
-// Returns the derivative string for a given input equation string
+// Returns the derivative formula for a given input equation
 //   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/derivstr/?eq=x^2
 func derivStrHandler(w http.ResponseWriter, r *http.Request) {
 	// Retrieve the potential equation string
@@ -53,21 +53,19 @@ func derivStrHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Input validation
-	//newEq, err := validate(inp)
-	//if err != nil {
-	//	http.Error(w, err.Error(), http.StatusBadRequest)
-	//
-	//	// Display message on server console
-	//	if debug {
-	//		fmt.Println(err.Error())
-	//	}
-	//	return
-	//}
+	newEq, err := validateEqStr(inp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 
-	str := "x^2"
+		// Display message on server console
+		if debug {
+			fmt.Println(err.Error())
+		}
+		return
+	}
 
-	// Return the derivative of the equation
-	//str := fmt.Sprintf("D[%s, x]", newEq.String())
+	// Return the derivative formula for the equation
+	str := fmt.Sprintf("D[%s, x]", newEq)
 	state := eq.NewEvalState()
 	expr := eq.Interp(str, state)
 	result := expr.Eval(state)
@@ -76,9 +74,9 @@ func derivStrHandler(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, deriv)
 
 	// Print the equation and derivative to the server console
-	//if debug {
-	//	fmt.Printf("Equation: '%v' - Derivative: '%v'\n", newEq.String(), deriv)
-	//}
+	if debug {
+		fmt.Printf("Equation: '%v' - Derivative: '%v'\n", newEq, deriv)
+	}
 }
 
 // Returns the derivative for a given input equation string + value
@@ -203,24 +201,12 @@ func solveEqHandler(w http.ResponseWriter, r *http.Request) {
 
 // Validates inputs
 func validate(inpEq string, inpMin string, inpMax string, inpStep string) (newEq string, min float64, max float64, step float64, err error) {
-	var badChars strings.Builder
-	var s strings.Builder
-	for _, j := range inpEq {
-		switch j {
-		case 'x', '+', '-', '*', '/', '^', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '(', ')', '[', ']':
-			// The character is valid
-			s.WriteRune(j)
-		default:
-			// The character is NOT valid
-			badChars.WriteRune(j)
-		}
-	}
-	if badChars.String() != "" {
-		// Return an appropriate error message
-		err = fmt.Errorf("bad character(s) in equation input string: %s", badChars.String())
+	// Validate the equation string
+	s, err := validateEqStr(inpEq)
+	if err != nil {
 		return
 	}
-	newEq = s.String()
+	newEq = s
 
 	// Validate floating point values
 	min, err = strconv.ParseFloat(inpMin, 64)
@@ -235,5 +221,31 @@ func validate(inpEq string, inpMin string, inpMax string, inpStep string) (newEq
 	if err != nil {
 		return
 	}
+	return
+}
+
+// Validates an equation string
+func validateEqStr(s string) (t string, err error) {
+	var badChars strings.Builder
+	var tmp strings.Builder
+	for _, j := range s {
+		switch j {
+		case 'x', '+', '-', '*', '/', '^', ' ', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '(', ')', '[', ']':
+			// The character is valid
+			tmp.WriteRune(j)
+		case 'X':
+			// The character is valid
+			tmp.WriteRune('x')
+		default:
+			// The character is NOT valid
+			badChars.WriteRune(j)
+		}
+	}
+	if badChars.String() != "" {
+		// Return an appropriate error message
+		err = fmt.Errorf("bad character(s) in equation input string: %s", badChars.String())
+		return
+	}
+	t = tmp.String()
 	return
 }
