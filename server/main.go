@@ -126,6 +126,7 @@ func solveDerivHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if errOccurred != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	// Return the result as JSON
@@ -143,60 +144,67 @@ func solveDerivHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Returns the solved equation for a given input equation string + value
-//   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/solveeq/?eq=x^2&val=2.0
+//   * Use a browser to simulate a call with (eg): http://0.0.0.0:8080/solveeq/?eq=x^2&min=-2.0&max=2.1&step=0.1
 func solveEqHandler(w http.ResponseWriter, r *http.Request) {
 	// Retrieve the potential equation string and value
-	//inpEq := r.FormValue("eq")
-	//inpMax := r.FormValue("max")
-	//inpMin := r.FormValue("min")
-	//inpStep := r.FormValue("step")
+	inpEq := r.FormValue("eq")
+	inpMax := r.FormValue("max")
+	inpMin := r.FormValue("min")
+	inpStep := r.FormValue("step")
+	if debug {
+		fmt.Printf("Solve input:\n * Eq: '%v'\n * Min: '%v'\n * Max: '%v'\n * Step: '%v'\n", inpEq, inpMin,
+			inpMax, inpStep)
+	}
 
-	//if debug {
-	//	fmt.Printf("Solve input: equation '%v' with value '%v' received\n", inpEq, inpVal)
-	//}
-
-	//// Validate equation string
-	//newEq, err := validate(inpEq)
-	//if err != nil {
-	//	http.Error(w, err.Error(), http.StatusBadRequest)
-	//	if debug {
-	//		fmt.Println(err.Error())
-	//	}
-	//	return
-	//}
-	//
-	//// Validate floating point value string
-	//val, err := strconv.ParseFloat(inpVal, 64)
-	//if err != nil {
-	//	http.Error(w, err.Error(), http.StatusBadRequest)
-	//	if debug {
-	//		fmt.Println(err.Error())
-	//	}
-	//	return
-	//}
-
-	str := "x^2"
-	val := 2.0
+	// Validate the inputs
+	newEq, min, max, step, err := validate(inpEq, inpMin, inpMax, inpStep)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		if debug {
+			fmt.Println(err.Error())
+		}
+		return
+	}
 
 	// Solve the equation
-	//str := fmt.Sprintf("f[x_] := %s", newEq.String())
-	state := eq.NewEvalState()
-	expr := eq.Interp(str, state)
-	part1 := expr.Eval(state)
-	part1 = state.ProcessTopLevelResult(expr, part1)
-	expr = eq.Interp(fmt.Sprintf("x=%.2f", val), state)
-	part2 := expr.Eval(state)
-	part2 = state.ProcessTopLevelResult(expr, part2)
-	expr = eq.Interp("f[x]", state)
-	part2 = expr.Eval(state)
-	part2 = state.ProcessTopLevelResult(expr, part2)
-	result := part2.StringForm(eq.ActualStringFormArgsFull("InputForm", state))
-	io.WriteString(w, result)
+	var points []Point
+	var errOccurred error
+	evalState := eq.NewEvalState()
+	expr := eq.Interp(fmt.Sprintf("f[x_] := %s", newEq), evalState)
+	result := expr.Eval(evalState)
+	result = evalState.ProcessTopLevelResult(expr, result)
+	for x := min; x <= max; x += step {
+		expr = eq.Interp(fmt.Sprintf("x=%.2f", x), evalState)
+		result := expr.Eval(evalState)
+		result = evalState.ProcessTopLevelResult(expr, result)
+		expr = eq.Interp("f[x]", evalState)
+		result = expr.Eval(evalState)
+		result = evalState.ProcessTopLevelResult(expr, result)
+		y, err := strconv.ParseFloat(result.StringForm(eq.ActualStringFormArgsFull("InputForm", evalState)), 64)
+		if err != nil {
+			y = -1 // Set this to -1 to visually indicate something went wrong
+			errOccurred = err
+			fmt.Printf("Error: %v\n", err)
+		}
+		points = append(points, Point{X: x, Y: y})
+	}
+	if errOccurred != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Return the result as JSON
+	output, err := json.MarshalIndent(points, "", " ")
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	io.WriteString(w, string(output))
 
 	// Print the equation, value and result to the server console
-	//if debug {
-	//	fmt.Printf("Equation: '%v', value: '%v' - Result: '%v'\n", newEq.String(), val, result)
-	//}
+	if debug {
+		fmt.Printf("Solve equation: '%v'\nResult: '%s'\n", newEq, output)
+	}
 }
 
 // Validates inputs
