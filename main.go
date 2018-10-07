@@ -291,14 +291,17 @@ func generateGraphAndDerives(newEq string) {
 	var p Point
 	errOccurred := false
 	graphLabeled := false
-	for x := -2.1; x <= 2.1; x += 0.05 {
-		y, err := solveEquation(newEq, x)
+	points, err := solveEquation(newEq, -2.1, 2.1, 0.05)
+	for _, i := range points {
+		var y float64
 		if err != nil {
 			y = -1 // Set this to -1 to visually indicate something went wrong
 			errOccurred = true
 			fmt.Printf("Error: %v\n", err)
+		} else {
+			y = i.Y
 		}
-		p = Point{X: x, Y: y}
+		p = Point{X: i.X, Y: y}
 		if !graphLabeled {
 			p.Label = fmt.Sprintf(" Equation: y = %s ", mathFormat(newEq))
 			p.LabelAlign = "right"
@@ -904,24 +907,23 @@ func scale(m matrix, x float64, y float64, z float64) matrix {
 }
 
 // Calls the backend server, retrieving the derivative for a given equation and input variable
-func solveDerivative(eq string, val float64) (float64, error) {
-	query := fmt.Sprintf("http://%s/solvederiv/?eq=%v&val=%.4f", server, eq, val)
+// TODO: Probably better to merge solveDerivative() & solveEquation() into a single function call
+func solveDerivative(eq string, min float64, max float64, step float64) (points []serverPoint, err error) {
+	query := fmt.Sprintf("http://%s/solvederiv/?eq=%v&min=%.4f&max=%.4f&step=%.4f", server, eq, min, max, step)
 	if debug {
-		fmt.Printf("Solve backend query: %v\n", query)
+		fmt.Printf("Derivative backend query: %v\n", query)
 	}
-	res, err := http.Get(query)
+	var res *http.Response
+	res, err = http.Get(query)
 	if err != nil {
-		return -1.0, err
+		return
 	}
 	s, _ := ioutil.ReadAll(res.Body)
 	if res.StatusCode != http.StatusOK {
-		return -1.0, fmt.Errorf(string(s))
+		return points, fmt.Errorf(string(s))
 	}
-	answer, err := strconv.ParseFloat(string(s), 64)
-	if err != nil {
-		return -1.0, err
-	}
-	return answer, nil
+	err = json.Unmarshal(s, &points)
+	return
 }
 
 // Calls the backend server, retrieving the answer for a given equation and input variable
