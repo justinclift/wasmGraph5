@@ -5,6 +5,7 @@ package main
 // TODO: Investigate how to compress wasm files, and serve them correctly from GitHub, Caddy, etc
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -55,6 +56,10 @@ type Operation struct {
 	X  float64
 	Y  float64
 	Z  float64
+}
+
+type serverPoint struct {
+	X, Y float64
 }
 
 const (
@@ -920,24 +925,22 @@ func solveDerivative(eq string, val float64) (float64, error) {
 }
 
 // Calls the backend server, retrieving the answer for a given equation and input variable
-func solveEquation(eq string, val float64) (float64, error) {
-	query := fmt.Sprintf("http://%s/solveeq/?eq=%v&val=%.4f", server, eq, val)
+func solveEquation(eq string, min float64, max float64, step float64) (points []serverPoint, err error) {
+	query := fmt.Sprintf("http://%s/solveeq/?eq=%v&min=%.4f&max=%.4f&step=%.4f", server, eq, min, max, step)
 	if debug {
 		fmt.Printf("Solve backend query: %v\n", query)
 	}
-	res, err := http.Get(query)
+	var res *http.Response
+	res, err = http.Get(query)
 	if err != nil {
-		return -1.0, err
+		return
 	}
 	s, _ := ioutil.ReadAll(res.Body)
 	if res.StatusCode != http.StatusOK {
-		return -1.0, fmt.Errorf(string(s))
+		return points, fmt.Errorf(string(s))
 	}
-	answer, err := strconv.ParseFloat(string(s), 64)
-	if err != nil {
-		return -1.0, err
-	}
-	return answer, nil
+	err = json.Unmarshal(s, &points)
+	return
 }
 
 // Returns the name/label prefix for a derivative string
