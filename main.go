@@ -11,7 +11,6 @@ import (
 	"math"
 	"net/http"
 	"regexp"
-	"strconv"
 	"strings"
 	"syscall/js"
 	"time"
@@ -289,11 +288,11 @@ func generateGraphAndDerives(newEq string) {
 	// Create a graph object with the main data points on it
 	var graph Object
 	var p Point
+	var y float64
 	errOccurred := false
 	graphLabeled := false
-	points, err := solveEquation(newEq, -2.1, 2.1, 0.05)
+	points, err := solveEquation(newEq, -2.1, 2.1, pointStep)
 	for _, i := range points {
-		var y float64
 		if err != nil {
 			y = -1 // Set this to -1 to visually indicate something went wrong
 			errOccurred = true
@@ -336,15 +335,18 @@ func generateGraphAndDerives(newEq string) {
 		errOccurred = false
 		graphLabeled = false
 		var deriv Object
-		for x := -2.1; x <= 2.1; x += pointStep {
-			y, err := solveDerivative(newEq, x)
+		var y float64
+		points, err := solveDerivative(newEq, -2.1, 2.1, 0.05)
+		for _, i := range points {
 			if err != nil {
 				y = -1 // Set this to -1 to visually indicate something went wrong
 				errOccurred = true
 				fmt.Printf("Error: %v\n", err)
+			} else {
+				y = i.Y
 			}
 			if debug {
-				fmt.Printf("Val: %0.2f Derivative String: %v Result: %v\n", x, derivStr, y)
+				fmt.Printf("Val: %0.2f Derivative String: %v Result: %v\n", i.X, derivStr, y)
 			}
 
 			// Determine if the derivative is a straight line
@@ -378,7 +380,7 @@ func generateGraphAndDerives(newEq string) {
 				}
 			}
 
-			p = Point{X: x, Y: y}
+			p = Point{X: i.X, Y: y}
 			if !graphLabeled {
 				p.Label = fmt.Sprintf(" %s order derivative: y = %s ", strDeriv(derivNum), mathFormat(derivStr))
 				p.LabelAlign = "right"
