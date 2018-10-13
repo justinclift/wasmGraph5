@@ -289,57 +289,13 @@ func generateGraphAndDerives(newEq string) {
 	worldSpace = append(worldSpace, importObject(axes, 0.0, 0.0, 0.0))
 
 	// Create a graph object with the main data points on it
-	var graph Object
-	var p Point
-	var y float64
-	errOccurred := false
-	graphLabeled := false
-	points, err := solveEquation(newEq, -2.1, 2.1, pointStep)
-	for _, i := range points {
-		if err != nil {
-			y = -1 // Set this to -1 to visually indicate something went wrong
-			errOccurred = true
-			fmt.Printf("Error: %v\n", err)
-		} else {
-			y = i.Y
-		}
-		p = Point{X: i.X, Y: y}
-		if !graphLabeled {
-			p.Label = fmt.Sprintf(" Equation: y = %s ", mathFormat(newEq))
-			p.LabelAlign = "right"
-			graphLabeled = true
-		}
-		graph.P = append(graph.P, p)
-	}
-	if errOccurred {
-		graph.C = "red" // Draw the line in red if an error occurred with the calculation
-	} else {
-		graph.C = "blue"
-	}
-	graph.Name = "Equation"
-	graph.Eq = fmt.Sprintf("y = %s", mathFormat(newEq))
-	worldSpace = append(worldSpace, importObject(graph, 0.0, 0.0, 0.0))
-
-	// Graph the derivatives of the equation
-	derivNum := 1
-	straightLine := true
-	for derivNum == 1 || straightLine != true { // Make sure at least one derivative gets calculated
-		straightLine = true // The slope check further on will toggle this back off if the derivative isn't a straight line
-
-		// Retrieve the human readable string for the derivative
-		derivStr, _ := retrieveDerivativeString(newEq)
-
-		// Variables used to determine if the derivative is a straight line
-		gotSlope := false
-		gotFirstPoint := false
-		var slope, slope2, slopeP1, slopeP2 float64
-
-		// Create a graph object with the derivative points on it
-		errOccurred = false
-		graphLabeled = false
-		var deriv Object
+	go func() {
+		var graph Object
+		var p Point
 		var y float64
-		points, err := solveDerivative(newEq, -2.1, 2.1, 0.05)
+		errOccurred := false
+		graphLabeled := false
+		points, err := solveEquation(newEq, -2.1, 2.1, pointStep)
 		for _, i := range points {
 			if err != nil {
 				y = -1 // Set this to -1 to visually indicate something went wrong
@@ -348,60 +304,109 @@ func generateGraphAndDerives(newEq string) {
 			} else {
 				y = i.Y
 			}
-			if debug {
-				fmt.Printf("Val: %0.2f Derivative String: %v Result: %v\n", i.X, derivStr, y)
-			}
-
-			// Determine if the derivative is a straight line
-			if !gotSlope {
-				if !gotFirstPoint {
-					slopeP1 = math.Round(y*10000) / 10000 // Round off, but keep a few decimal places of precision
-					gotFirstPoint = true
-				} else {
-					slopeP2 = math.Round(y*10000) / 10000
-					riseOverRun := (slopeP2 - slopeP1) / pointStep
-					slope = math.Round(riseOverRun*10000) / 10000
-					if debug {
-						fmt.Printf("Slope: (%v - %v) / %v = %v\n", slopeP2, slopeP1, pointStep, slope)
-					}
-					slopeP1 = slopeP2
-					gotSlope = true
-				}
-			} else {
-				slopeP2 = math.Round(y*10000) / 10000
-				riseOverRun := (slopeP2 - slopeP1) / pointStep
-				slope2 = math.Round(riseOverRun*10000) / 10000
-				if debug {
-					fmt.Printf("Slope2: (%v - %v) / %v = %v", slopeP2, slopeP1, pointStep, slope2)
-				}
-				slopeP1 = slopeP2
-				if slope != slope2 {
-					straightLine = false
-				}
-				if debug {
-					fmt.Printf(" Straight line: %v\n", straightLine)
-				}
-			}
-
 			p = Point{X: i.X, Y: y}
 			if !graphLabeled {
-				p.Label = fmt.Sprintf(" %s order derivative: y = %s ", strDeriv(derivNum), mathFormat(derivStr))
+				p.Label = fmt.Sprintf(" Equation: y = %s ", mathFormat(newEq))
 				p.LabelAlign = "right"
 				graphLabeled = true
 			}
-			deriv.P = append(deriv.P, p)
+			graph.P = append(graph.P, p)
 		}
 		if errOccurred {
-			deriv.C = "red" // Draw the line in red if an error occurred with the calculation
+			graph.C = "red" // Draw the line in red if an error occurred with the calculation
 		} else {
-			deriv.C = colDeriv(derivNum)
+			graph.C = "blue"
 		}
-		deriv.Name = fmt.Sprintf("%s order derivative", strDeriv(derivNum))
-		deriv.Eq = fmt.Sprintf("y = %s", mathFormat(derivStr))
-		worldSpace = append(worldSpace, importObject(deriv, 0.0, 0.0, 0.0))
-		newEq = derivStr
-		derivNum++
-	}
+		graph.Name = "Equation"
+		graph.Eq = fmt.Sprintf("y = %s", mathFormat(newEq))
+		worldSpace = append(worldSpace, importObject(graph, 0.0, 0.0, 0.0))
+	}()
+
+	// Graph the derivatives of the equation
+	go func() {
+		var p Point
+		derivNum := 1
+		straightLine := true
+		for derivNum == 1 || straightLine != true { // Make sure at least one derivative gets calculated
+			straightLine = true // The slope check further on will toggle this back off if the derivative isn't a straight line
+
+			// Retrieve the human readable string for the derivative
+			derivStr, _ := retrieveDerivativeString(newEq)
+
+			// Variables used to determine if the derivative is a straight line
+			gotSlope := false
+			gotFirstPoint := false
+			var slope, slope2, slopeP1, slopeP2 float64
+
+			// Create a graph object with the derivative points on it
+			errOccurred := false
+			graphLabeled := false
+			var deriv Object
+			var y float64
+			points, err := solveDerivative(newEq, -2.1, 2.1, 0.05)
+			for _, i := range points {
+				if err != nil {
+					y = -1 // Set this to -1 to visually indicate something went wrong
+					errOccurred = true
+					fmt.Printf("Error: %v\n", err)
+				} else {
+					y = i.Y
+				}
+				if debug {
+					fmt.Printf("Val: %0.2f Derivative String: %v Result: %v\n", i.X, derivStr, y)
+				}
+
+				// Determine if the derivative is a straight line
+				if !gotSlope {
+					if !gotFirstPoint {
+						slopeP1 = math.Round(y*10000) / 10000 // Round off, but keep a few decimal places of precision
+						gotFirstPoint = true
+					} else {
+						slopeP2 = math.Round(y*10000) / 10000
+						riseOverRun := (slopeP2 - slopeP1) / pointStep
+						slope = math.Round(riseOverRun*10000) / 10000
+						if debug {
+							fmt.Printf("Slope: (%v - %v) / %v = %v\n", slopeP2, slopeP1, pointStep, slope)
+						}
+						slopeP1 = slopeP2
+						gotSlope = true
+					}
+				} else {
+					slopeP2 = math.Round(y*10000) / 10000
+					riseOverRun := (slopeP2 - slopeP1) / pointStep
+					slope2 = math.Round(riseOverRun*10000) / 10000
+					if debug {
+						fmt.Printf("Slope2: (%v - %v) / %v = %v", slopeP2, slopeP1, pointStep, slope2)
+					}
+					slopeP1 = slopeP2
+					if slope != slope2 {
+						straightLine = false
+					}
+					if debug {
+						fmt.Printf(" Straight line: %v\n", straightLine)
+					}
+				}
+
+				p = Point{X: i.X, Y: y}
+				if !graphLabeled {
+					p.Label = fmt.Sprintf(" %s order derivative: y = %s ", strDeriv(derivNum), mathFormat(derivStr))
+					p.LabelAlign = "right"
+					graphLabeled = true
+				}
+				deriv.P = append(deriv.P, p)
+			}
+			if errOccurred {
+				deriv.C = "red" // Draw the line in red if an error occurred with the calculation
+			} else {
+				deriv.C = colDeriv(derivNum)
+			}
+			deriv.Name = fmt.Sprintf("%s order derivative", strDeriv(derivNum))
+			deriv.Eq = fmt.Sprintf("y = %s", mathFormat(derivStr))
+			worldSpace = append(worldSpace, importObject(deriv, 0.0, 0.0, 0.0))
+			newEq = derivStr
+			derivNum++
+		}
+	}()
 }
 
 // Returns an object whose points have been transformed into 3D world space XYZ co-ordinates.  Also assigns a number
