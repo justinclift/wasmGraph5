@@ -71,7 +71,10 @@ func derivStrHandler(w http.ResponseWriter, r *http.Request) {
 	result := expr.Eval(state)
 	result = state.ProcessTopLevelResult(expr, result)
 	deriv := result.StringForm(eq.ActualStringFormArgsFull("OutputForm", state))
-	io.WriteString(w, deriv)
+	_, err = io.WriteString(w, deriv)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 
 	// Print the equation and derivative to the server console
 	if debug {
@@ -135,7 +138,10 @@ func solveDerivHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	io.WriteString(w, string(output))
+	_, err = io.WriteString(w, string(output))
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 
 	// Print the equation, value and result to the server console
 	if debug {
@@ -199,7 +205,10 @@ func solveEqHandler(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 		return
 	}
-	io.WriteString(w, string(output))
+	_, err = io.WriteString(w, string(output))
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 
 	// Print the equation, value and result to the server console
 	if debug {
